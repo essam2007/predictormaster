@@ -33,7 +33,7 @@ class GraphAttentionTrainer:
     def fit(self, data, epochs: int = 100) -> None:  # pragma: no cover - integration
         try:
             import torch
-            import torch.nn.functional as F
+            import torch.nn.functional as F  # noqa: N812
             from torch_geometric.nn import GATv2Conv
         except Exception as exc:
             raise RuntimeError("torch + torch_geometric are required") from exc

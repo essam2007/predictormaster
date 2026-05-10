@@ -21,7 +21,7 @@ class HMM:
     B: np.ndarray  # K x M emission
 
     @classmethod
-    def random(cls, n_states: int, n_obs: int, *, rng: np.random.Generator | None = None) -> "HMM":
+    def random(cls, n_states: int, n_obs: int, *, rng: np.random.Generator | None = None) -> HMM:
         rng = rng or np.random.default_rng(0)
         pi = rng.dirichlet(np.ones(n_states))
         A = rng.dirichlet(np.ones(n_states), size=n_states)
@@ -29,7 +29,7 @@ class HMM:
         return cls(pi=pi, A=A, B=B)
 
 
-def _init_from_obs(obs: np.ndarray, n_states: int, n_obs: int, *, rng: np.random.Generator) -> "HMM":
+def _init_from_obs(obs: np.ndarray, n_states: int, n_obs: int, *, rng: np.random.Generator) -> HMM:
     """Cheap data-aware init: split `obs` into `n_states` contiguous chunks
     and seed B from the empirical symbol frequency in each chunk. Reduces
     local-optimum variance without any new dependencies.
@@ -117,7 +117,6 @@ def baum_welch(
     hmm = _init_from_obs(obs, n_states, n_symbols, rng=rng)
     history: list[float] = []
     prev_ll = -np.inf
-    T = len(obs)
     for _ in range(n_iter):
         alpha, ll = _forward(hmm, obs)
         beta = _backward(hmm, obs)

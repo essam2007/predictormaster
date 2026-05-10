@@ -59,7 +59,7 @@ class SplitConformalClassifier:
     alpha: float = 0.1
     _threshold: float = 1.0
 
-    def calibrate(self, X_cal: np.ndarray, y_cal: np.ndarray) -> "SplitConformalClassifier":
+    def calibrate(self, X_cal: np.ndarray, y_cal: np.ndarray) -> SplitConformalClassifier:
         probs = np.asarray(self.base.predict_proba(X_cal), dtype=float)  # type: ignore[attr-defined]
         scores = _nonconformity(probs, np.asarray(y_cal, dtype=int))
         self._threshold = _quantile(scores, self.alpha)
@@ -104,7 +104,7 @@ class MondrianConformalClassifier:
     _thresholds: dict[int, float] = field(default_factory=dict)
     _global_threshold: float = 1.0
 
-    def calibrate(self, X_cal: np.ndarray, y_cal: np.ndarray) -> "MondrianConformalClassifier":
+    def calibrate(self, X_cal: np.ndarray, y_cal: np.ndarray) -> MondrianConformalClassifier:
         probs = np.asarray(self.base.predict_proba(X_cal), dtype=float)  # type: ignore[attr-defined]
         y = np.asarray(y_cal, dtype=int)
         scores = _nonconformity(probs, y)

@@ -98,13 +98,20 @@ def _laplace_cov(theta: np.ndarray, h: np.ndarray, a: np.ndarray, hg: np.ndarray
     eps = 1e-4
     p = len(theta)
     H = np.zeros((p, p))
-    f0 = _neg_log_posterior(theta, h, a, hg, ag, n)
     for i in range(p):
         for j in range(i, p):
-            t_pp = theta.copy(); t_pp[i] += eps; t_pp[j] += eps
-            t_pm = theta.copy(); t_pm[i] += eps; t_pm[j] -= eps
-            t_mp = theta.copy(); t_mp[i] -= eps; t_mp[j] += eps
-            t_mm = theta.copy(); t_mm[i] -= eps; t_mm[j] -= eps
+            t_pp = theta.copy()
+            t_pp[i] += eps
+            t_pp[j] += eps
+            t_pm = theta.copy()
+            t_pm[i] += eps
+            t_pm[j] -= eps
+            t_mp = theta.copy()
+            t_mp[i] -= eps
+            t_mp[j] += eps
+            t_mm = theta.copy()
+            t_mm[i] -= eps
+            t_mm[j] -= eps
             f_pp = _neg_log_posterior(t_pp, h, a, hg, ag, n)
             f_pm = _neg_log_posterior(t_pm, h, a, hg, ag, n)
             f_mp = _neg_log_posterior(t_mp, h, a, hg, ag, n)
@@ -128,7 +135,7 @@ def fit_pymc(*, home, away, home_goals, away_goals, draws=1000, tune=1000):  # p
     a = np.array([idx[t] for t in away])
     n = len(teams)
 
-    with pm.Model() as model:
+    with pm.Model():
         sigma_a = pm.HalfNormal("sigma_a", 1.0)
         sigma_b = pm.HalfNormal("sigma_b", 1.0)
         alpha = pm.Normal("alpha", 0.0, sigma_a, shape=n)

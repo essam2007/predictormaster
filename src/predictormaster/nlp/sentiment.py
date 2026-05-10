@@ -18,7 +18,6 @@ from typing import Protocol
 
 import numpy as np
 
-
 _POS_LEXICON = {"great", "win", "dominant", "stunning", "elite", "improved", "fit", "back"}
 _NEG_LEXICON = {"injury", "out", "doubtful", "fatigued", "lost", "poor", "rumour", "suspended"}
 

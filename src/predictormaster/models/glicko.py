@@ -80,7 +80,7 @@ class Glicko2:
         """
         snapshot: dict[str, GlickoState] = {p: GlickoState(**vars(self.state(p))) for p in self.states}
         # Make sure every opponent referenced is also in snapshot.
-        for p, results in period.items():
+        for results in period.values():
             for opp, _ in results:
                 if opp not in snapshot:
                     snapshot[opp] = GlickoState(**vars(self.state(opp)))

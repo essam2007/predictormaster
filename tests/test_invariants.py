@@ -69,7 +69,6 @@ def test_elo_batch_zero_sum(score_home, score_away, seed):
     n = min(len(score_home), len(score_away))
     score_home = score_home[:n]
     score_away = score_away[:n]
-    rng = np.random.default_rng(seed)
     teams = [f"t{i}" for i in range(2 * n)]
     home = teams[:n]
     away = teams[n:]

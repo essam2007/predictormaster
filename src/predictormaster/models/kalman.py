@@ -33,8 +33,8 @@ class KalmanFilter:
         S = self.H @ self.P @ self.H.T + self.R
         K = self.P @ self.H.T @ np.linalg.inv(S)
         self.x = self.x + K @ innov
-        I = np.eye(self.P.shape[0])
-        self.P = (I - K @ self.H) @ self.P
+        eye = np.eye(self.P.shape[0])
+        self.P = (eye - K @ self.H) @ self.P
         return self.x.copy(), self.P.copy()
 
     def step(self, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
