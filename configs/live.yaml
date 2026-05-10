@@ -1,0 +1,25 @@
+polymarket:
+  gamma: https://gamma-api.polymarket.com
+  clob: https://clob.polymarket.com
+kalshi:
+  base: https://api.elections.kalshi.com/trade-api/v2
+  series: [KXNBA, KXNFL, KXMLB, KXNHL, KXEPL, KXUEFA, KXNCAA, KXTENNIS, KXUFC, KXBOXING, KXF1]
+sportsbooks:
+  base: https://api.the-odds-api.com/v4
+  sport: upcoming
+  api_key_env: THE_ODDS_API_KEY
+text:
+  reddit_subs: [nba, nfl, soccer, baseball, hockey, sports]
+  rss_feeds:
+    - https://www.espn.com/espn/rss/news
+  x_bearer_env: X_BEARER_TOKEN
+fusion:
+  w_text: 0.4
+  w_market: 0.4
+  w_narrative: 0.2
+windows:
+  rolling_minutes: 30
+runner:
+  discover_seconds: 60
+  text_poll_seconds: 5
+  rss_poll_seconds: 60
