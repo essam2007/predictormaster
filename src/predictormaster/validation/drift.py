@@ -2,13 +2,15 @@
 
 Implements:
   * Page-Hinkley: cumulative-deviation test for mean shifts
-  * ADWIN: adaptive sliding window with sub-window comparison
+  * ADWIN: adaptive sliding window with exponential-histogram buckets,
+    amortised O(log n) per update (Bifet & Gavaldà 2007)
 """
 from __future__ import annotations
 
 import math
-from collections import deque
 from dataclasses import dataclass, field
+
+from ._adwin_buckets import BucketRows
 
 
 @dataclass
@@ -33,41 +35,39 @@ class PageHinkley:
 class ADWIN:
     """Concept-drift detector by Bifet & Gavaldà (2007).
 
-    Maintains a window of recent samples; whenever any split into a left and
-    right sub-window shows mean separation beyond an epsilon-cut, the older
-    half is dropped and `update` returns True.
+    Maintains a sliding window represented as a row of exponential
+    histograms. Every ``update`` checks each bucket-aligned cut for an
+    epsilon-significant difference in means; on detection, the older
+    sub-window is dropped and ``True`` is returned. Amortised cost is
+    O(log n) per update.
     """
 
     delta: float = 0.002
-    window: deque[float] = field(default_factory=deque)
-    total: float = 0.0
+    max_buckets_per_row: int = 5
+    _rows: BucketRows = field(default_factory=BucketRows)
+
+    @property
+    def size(self) -> int:
+        return self._rows.size
+
+    @property
+    def total(self) -> float:
+        return self._rows.total
 
     def _epsilon_cut(self, n0: int, n1: int) -> float:
         m = 1.0 / (1.0 / max(n0, 1) + 1.0 / max(n1, 1))
-        var = self._variance()
-        return math.sqrt(2.0 * m * var * math.log(2.0 / self.delta) / max(n0 + n1, 1)) + 2.0 / 3.0 * math.log(2.0 / self.delta) / m
-
-    def _variance(self) -> float:
-        if not self.window:
-            return 1.0
-        n = len(self.window)
-        mean = self.total / n
-        return sum((x - mean) ** 2 for x in self.window) / n
+        var = self._rows.variance() or 1.0
+        denom = max(n0 + n1, 1)
+        return math.sqrt(2.0 * m * var * math.log(2.0 / self.delta) / denom) + (
+            2.0 / 3.0 * math.log(2.0 / self.delta) / m
+        )
 
     def update(self, x: float) -> bool:
-        self.window.append(x)
-        self.total += x
-        n = len(self.window)
-        for split in range(1, n):
-            n0 = split
-            n1 = n - split
-            left = list(self.window)[:n0]
-            right = list(self.window)[n0:]
-            mu0 = sum(left) / n0
-            mu1 = sum(right) / n1
-            if abs(mu0 - mu1) > self._epsilon_cut(n0, n1):
-                # drop the older sub-window
-                for _ in range(n0):
-                    self.total -= self.window.popleft()
+        if not self._rows.rows:
+            self._rows.max_buckets_per_row = self.max_buckets_per_row
+        self._rows.add(x)
+        for n0, n1, mean0, mean1 in self._rows.cuts():
+            if abs(mean0 - mean1) > self._epsilon_cut(n0, n1):
+                self._rows.drop_left(n0)
                 return True
         return False

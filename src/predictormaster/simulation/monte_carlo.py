@@ -57,11 +57,12 @@ def simulate_poisson(
 
 def _pmf_from_samples(h: np.ndarray, a: np.ndarray, max_goals: int) -> np.ndarray:
     pmf = np.zeros((max_goals + 1, max_goals + 1))
-    h_clipped = np.clip(h, 0, max_goals)
-    a_clipped = np.clip(a, 0, max_goals)
-    for hi, ai in zip(h_clipped, a_clipped, strict=True):
-        pmf[hi, ai] += 1
-    pmf /= pmf.sum()
+    h_clipped = np.clip(h, 0, max_goals).astype(np.intp)
+    a_clipped = np.clip(a, 0, max_goals).astype(np.intp)
+    np.add.at(pmf, (h_clipped, a_clipped), 1)
+    total = pmf.sum()
+    if total > 0:
+        pmf /= total
     return pmf
 
 
@@ -82,15 +83,21 @@ def simulate_possessions(
     away_p = np.asarray(away_p) / sum(away_p)
 
     half = n_possessions // 2
+    away_half = n_possessions - half
     home_made = rng.binomial(half, home_score_prob, size=n_sims)
-    away_made = rng.binomial(n_possessions - half, away_score_prob, size=n_sims)
-    h = np.zeros(n_sims, dtype=int)
-    a = np.zeros(n_sims, dtype=int)
-    for i in range(n_sims):
-        if home_made[i] > 0:
-            h[i] = int(rng.choice(home_pts, p=home_p, size=home_made[i]).sum())
-        if away_made[i] > 0:
-            a[i] = int(rng.choice(away_pts, p=away_p, size=away_made[i]).sum())
+    away_made = rng.binomial(away_half, away_score_prob, size=n_sims)
+    home_pts_arr = np.asarray(home_pts, dtype=np.int64)
+    away_pts_arr = np.asarray(away_pts, dtype=np.int64)
+    # Vectorise: draw the maximum possible scoring possessions per sim, then
+    # mask the unused tail. n_sims * half memory is bounded by the caller's
+    # n_possessions choice; for typical (n_possessions ~ 100, n_sims = 5e4)
+    # this is ~40 MB, well within budget and ~10x faster than the per-sim loop.
+    home_draws = rng.choice(home_pts_arr, size=(n_sims, half), p=home_p)
+    away_draws = rng.choice(away_pts_arr, size=(n_sims, away_half), p=away_p)
+    home_mask = np.arange(half)[None, :] < home_made[:, None]
+    away_mask = np.arange(away_half)[None, :] < away_made[:, None]
+    h = (home_draws * home_mask).sum(axis=1).astype(np.int64)
+    a = (away_draws * away_mask).sum(axis=1).astype(np.int64)
     p_home = float(np.mean(h > a))
     p_draw = float(np.mean(h == a))
     p_away = float(np.mean(h < a))

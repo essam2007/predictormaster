@@ -30,11 +30,25 @@ def systematic_resample(weights: np.ndarray, *, rng: np.random.Generator) -> np.
 
 @dataclass
 class ParticleFilter:
+    """Bootstrap particle filter.
+
+    ``resample_threshold`` is the ESS/N ratio at which systematic resampling
+    is triggered. Must lie in (0, 1]; the canonical Liu (1996) default is
+    0.5. Larger values resample more aggressively (lower variance per step,
+    higher Monte Carlo variance over time); smaller values resample less.
+    """
+
     transition: Callable[[np.ndarray, np.random.Generator], np.ndarray]
     log_likelihood: Callable[[np.ndarray, np.ndarray], np.ndarray]
     particles: np.ndarray
     log_weights: np.ndarray
     resample_threshold: float = 0.5
+
+    def __post_init__(self) -> None:
+        if not (0.0 < self.resample_threshold <= 1.0):
+            raise ValueError(
+                f"resample_threshold must lie in (0, 1]; got {self.resample_threshold}"
+            )
 
     def step(self, y: np.ndarray, *, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
         self.particles = self.transition(self.particles, rng)

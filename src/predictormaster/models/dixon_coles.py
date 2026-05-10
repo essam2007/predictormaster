@@ -114,8 +114,109 @@ def _neg_loglik(
     log_p = _log_poisson_pmf(home_goals, lam) + _log_poisson_pmf(away_goals, mu)
     tau = _tau(home_goals, away_goals, lam, mu, rho)
     if np.any(tau <= 0.0):
-        return 1e12
+        return float(np.inf)
     return float(-np.sum(weights * (np.log(tau) + log_p)))
+
+
+def _tau_grad(
+    x: np.ndarray, y: np.ndarray, lam: np.ndarray, mu: np.ndarray, rho: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Returns (d log tau / d log lam, d log tau / d log mu, d log tau / d rho).
+
+    Using d/d log lam = lam * d/d lam, the chain rule gives (recalling tau = 1
+    in non-corner cells, hence zero contribution there):
+
+        cell (0,0): tau = 1 - lam*mu*rho
+            d log tau / d log lam = -lam*mu*rho / (1 - lam*mu*rho)
+            d log tau / d log mu  = -lam*mu*rho / (1 - lam*mu*rho)
+            d log tau / d rho     = -lam*mu     / (1 - lam*mu*rho)
+        cell (0,1): tau = 1 + lam*rho
+            d log tau / d log lam =  lam*rho   / (1 + lam*rho)
+            d log tau / d rho     =  lam       / (1 + lam*rho)
+        cell (1,0): tau = 1 + mu*rho
+            d log tau / d log mu  =  mu*rho    / (1 + mu*rho)
+            d log tau / d rho     =  mu        / (1 + mu*rho)
+        cell (1,1): tau = 1 - rho
+            d log tau / d rho     = -1         / (1 - rho)
+    """
+    g_lam = np.zeros_like(lam)
+    g_mu = np.zeros_like(lam)
+    g_rho = np.zeros_like(lam)
+
+    m00 = (x == 0) & (y == 0)
+    m01 = (x == 0) & (y == 1)
+    m10 = (x == 1) & (y == 0)
+    m11 = (x == 1) & (y == 1)
+
+    if np.any(m00):
+        denom = 1.0 - lam[m00] * mu[m00] * rho
+        g_lam[m00] = -lam[m00] * mu[m00] * rho / denom
+        g_mu[m00] = -lam[m00] * mu[m00] * rho / denom
+        g_rho[m00] = -lam[m00] * mu[m00] / denom
+    if np.any(m01):
+        denom = 1.0 + lam[m01] * rho
+        g_lam[m01] = lam[m01] * rho / denom
+        g_rho[m01] = lam[m01] / denom
+    if np.any(m10):
+        denom = 1.0 + mu[m10] * rho
+        g_mu[m10] = mu[m10] * rho / denom
+        g_rho[m10] = mu[m10] / denom
+    if np.any(m11):
+        denom = 1.0 - rho
+        g_rho[m11] = -1.0 / denom
+    return g_lam, g_mu, g_rho
+
+
+def _neg_loglik_grad(
+    theta: np.ndarray,
+    home_idx: np.ndarray,
+    away_idx: np.ndarray,
+    home_goals: np.ndarray,
+    away_goals: np.ndarray,
+    n_teams: int,
+    weights: np.ndarray,
+) -> np.ndarray:
+    """Closed-form gradient of `_neg_loglik` w.r.t. the packed `theta` vector.
+
+    Decomposition (negating because we minimise the negative log-lik):
+
+        d ell / d log lam_i = w_i [ (x_i - lam_i) + g_lam_i ]
+        d ell / d log mu_i  = w_i [ (y_i - mu_i)  + g_mu_i  ]
+        d ell / d rho       = sum_i w_i * g_rho_i
+
+    Then propagate via:
+        log lam_i = alpha_h + beta_a + gamma
+        log mu_i  = alpha_a + beta_h
+
+    The sum-to-zero constraint on alpha is enforced by mapping the gradient
+    on the n-vector alpha to the (n-1)-vector of free parameters via
+        d/d alpha_free_k = d/d alpha_k - d/d alpha_{T-1}.
+    """
+    alpha, beta, gamma, rho = _unpack(theta, n_teams)
+    lam = np.exp(alpha[home_idx] + beta[away_idx] + gamma)
+    mu = np.exp(alpha[away_idx] + beta[home_idx])
+    tau = _tau(home_goals, away_goals, lam, mu, rho)
+    if np.any(tau <= 0.0):
+        return np.full_like(theta, np.nan)
+
+    g_lam_tau, g_mu_tau, g_rho_tau = _tau_grad(home_goals, away_goals, lam, mu, rho)
+    d_log_lam = weights * ((home_goals - lam) + g_lam_tau)
+    d_log_mu = weights * ((away_goals - mu) + g_mu_tau)
+    d_rho = float(np.sum(weights * g_rho_tau))
+
+    grad_alpha = np.zeros(n_teams)
+    grad_beta = np.zeros(n_teams)
+    np.add.at(grad_alpha, home_idx, d_log_lam)
+    np.add.at(grad_alpha, away_idx, d_log_mu)
+    np.add.at(grad_beta, away_idx, d_log_lam)
+    np.add.at(grad_beta, home_idx, d_log_mu)
+    grad_gamma = float(np.sum(d_log_lam))
+
+    # alpha_{n-1} = -sum(alpha_free); chain-rule contracts to subtraction.
+    grad_alpha_free = grad_alpha[:-1] - grad_alpha[-1]
+
+    grad = np.concatenate([grad_alpha_free, grad_beta, [grad_gamma, d_rho]])
+    return -grad  # we minimise -ell; sign-flip the gradient.
 
 
 def fit_dixon_coles(
@@ -147,12 +248,18 @@ def fit_dixon_coles(
     theta0[-2] = 0.25  # home advantage warm start
     theta0[-1] = -0.05  # rho warm start
 
+    # We use unbounded BFGS rather than L-BFGS-B: the alpha/beta/gamma
+    # parameters are unbounded in the model (only rho is constrained, and
+    # we keep it interior via the inf sentinel inside `_neg_loglik`), and
+    # L-BFGS-B's line search interacts badly with the boundary penalty,
+    # stalling on iter 1 even with a correct analytic gradient.
     result = minimize(
         _neg_loglik,
         theta0,
         args=(home_idx, away_idx, hg, ag, n_teams, weights),
-        method="L-BFGS-B",
-        bounds=[(-3.0, 3.0)] * (2 * n_teams - 1) + [(-1.0, 2.0), (-0.49, 0.49)],
+        jac=_neg_loglik_grad,
+        method="BFGS",
+        options={"gtol": 1e-5, "maxiter": 200},
     )
 
     alpha, beta, gamma, rho = _unpack(result.x, n_teams)

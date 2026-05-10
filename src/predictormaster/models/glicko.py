@@ -69,6 +69,36 @@ class Glicko2:
     def state(self, player: str) -> GlickoState:
         return self.states.setdefault(player, GlickoState())
 
+    def update_batch(self, period: dict[str, list[tuple[str, float]]]) -> None:
+        """Apply one rating period for many players against a shared
+        snapshot of opponent states.
+
+        All opponent states are read *before* any player is updated, so the
+        order in which players appear in ``period`` does not affect the
+        result — matching the standard Glicko-2 specification, which is
+        period-batched rather than online.
+        """
+        snapshot: dict[str, GlickoState] = {p: GlickoState(**vars(self.state(p))) for p in self.states}
+        # Make sure every opponent referenced is also in snapshot.
+        for p, results in period.items():
+            for opp, _ in results:
+                if opp not in snapshot:
+                    snapshot[opp] = GlickoState(**vars(self.state(opp)))
+        # Stash and restore so each per-player update reads the snapshot.
+        original_states = self.states
+        try:
+            self.states = snapshot
+            updated: dict[str, GlickoState] = {}
+            for p, results in period.items():
+                # `update` mutates `self.states[p]` based on snapshot opponents.
+                self.update(p, results)
+                updated[p] = self.states[p]
+        finally:
+            self.states = original_states
+        # Commit the updated player states into the live store.
+        for p, st in updated.items():
+            self.states[p] = st
+
     def update(self, player: str, results: list[tuple[str, float]]) -> GlickoState:
         """Apply a single rating period for `player` against opponents.
 

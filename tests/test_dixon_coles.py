@@ -2,8 +2,13 @@
 from __future__ import annotations
 
 import numpy as np
+from scipy.optimize import approx_fprime
 
-from predictormaster.models.dixon_coles import fit_dixon_coles
+from predictormaster.models.dixon_coles import (
+    _neg_loglik,
+    _neg_loglik_grad,
+    fit_dixon_coles,
+)
 
 
 def _simulate(rng: np.random.Generator, n: int = 800) -> dict:
@@ -57,6 +62,23 @@ def test_outcome_probs_sum_to_one():
     p_h, p_d, p_a = fit.outcome_probs(data["teams"][0], data["teams"][1])
     assert abs(p_h + p_d + p_a - 1.0) < 1e-6
     assert 0 <= p_h <= 1 and 0 <= p_d <= 1 and 0 <= p_a <= 1
+
+
+def test_analytic_gradient_matches_finite_difference():
+    rng = np.random.default_rng(2)
+    n_teams = 5
+    home_idx = rng.integers(0, n_teams, size=300)
+    away_idx = rng.integers(0, n_teams, size=300)
+    hg = rng.poisson(1.5, size=300).astype(float)
+    ag = rng.poisson(1.0, size=300).astype(float)
+    weights = np.ones(300)
+    theta = np.concatenate(
+        [rng.normal(0, 0.2, n_teams - 1), rng.normal(0, 0.2, n_teams), [0.25, -0.05]]
+    )
+    args = (home_idx, away_idx, hg, ag, n_teams, weights)
+    g_a = _neg_loglik_grad(theta, *args)
+    g_n = approx_fprime(theta, _neg_loglik, 1e-6, *args)
+    assert np.max(np.abs(g_a - g_n)) < 1e-3
 
 
 def test_score_pmf_normalised():

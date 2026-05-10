@@ -14,6 +14,8 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+import numpy as np
+
 
 @dataclass
 class EloRater:
@@ -54,6 +56,45 @@ class EloRater:
         self.ratings[home] = self.get(home) + delta
         self.ratings[away] = self.get(away) - delta
         return self.ratings[home], self.ratings[away]
+
+    def update_batch(
+        self,
+        home: list[str],
+        away: list[str],
+        home_score: np.ndarray,
+        away_score: np.ndarray,
+    ) -> None:
+        """Apply a fixture round in vectorised form.
+
+        Each match's expectation is computed against the *pre-round* rating;
+        all updates are then applied simultaneously, preserving the zero-sum
+        invariant exactly when the same team appears multiple times.
+        """
+        n = len(home)
+        if not (n == len(away) == len(home_score) == len(away_score)):
+            raise ValueError("home/away/home_score/away_score must share length")
+        r_home = np.asarray([self.get(t) for t in home], dtype=float)
+        r_away = np.asarray([self.get(t) for t in away], dtype=float)
+        diff = (r_away - r_home - self.home_advantage) / self.scale
+        e_home = 1.0 / (1.0 + np.power(10.0, diff))
+        score_diff = home_score - away_score
+        s_home = np.where(score_diff > 0, 1.0, np.where(score_diff < 0, 0.0, 0.5))
+        margin = np.abs(score_diff)
+        rating_diff = np.abs(r_home + self.home_advantage - r_away)
+        mov = np.where(
+            margin == 0,
+            1.0,
+            np.log(margin + 1.0) * 2.2 / (0.001 * rating_diff + 2.2),
+        )
+        delta = self.k * mov * (s_home - e_home)
+        # Aggregate per-team total deltas across the round.
+        agg: dict[str, float] = defaultdict(float)
+        for t, d in zip(home, delta, strict=True):
+            agg[t] += float(d)
+        for t, d in zip(away, delta, strict=True):
+            agg[t] -= float(d)
+        for t, d in agg.items():
+            self.ratings[t] = self.get(t) + d
 
 
 @dataclass
