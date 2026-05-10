@@ -85,6 +85,9 @@ pip install -e ".[dev]"
 pytest -q
 python -m predictormaster.serving.api  # local FastAPI server
 docker compose up -d                   # MLflow + feature-store + observability
+
+pip install -e ".[dashboard]"
+streamlit run dashboards/strategy.py   # data / distributions / Kalman / Sharpe
 ```
 
 ## Research integrity

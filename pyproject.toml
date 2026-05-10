@@ -46,6 +46,10 @@ pipeline = [
     "mlflow>=2.11",
     "feast>=0.36",
 ]
+dashboard = [
+    "streamlit>=1.30",
+    "plotly>=5.18",
+]
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
@@ -60,6 +64,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-q --strict-markers -m 'not bench'"
 markers = [
     "bench: performance regression harness (run with `pytest -m bench --benchmark-only`)",
