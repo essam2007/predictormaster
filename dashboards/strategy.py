@@ -5,16 +5,24 @@ Launch:
     pip install -e ".[dashboard]"
     streamlit run dashboards/strategy.py
 """
-from __future__ import annotations
+import sys
+from pathlib import Path
+
+# Ensure the project root is on sys.path regardless of how Streamlit
+# was invoked. Streamlit inserts the script's own directory, not the
+# project root, so absolute imports like `from dashboards._data import`
+# would otherwise fail.
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
-
-import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+import streamlit as st
 from scipy import stats
 
 from dashboards._data import (
@@ -71,6 +79,11 @@ def _strategy(sport, start, end, seed, q, r, edge_threshold, bet_fraction, juice
 
 mf = _load(sport, start, end, int(seed))
 mf, trace = _kalman(sport, start, end, int(seed), q, r)
+
+st.caption(f"data source: {getattr(mf, 'source', 'unknown')} · {len(mf.matches)} completed games")
+if mf.matches.empty:
+    st.warning("No completed games in this range from the live feed. Widen the date range or pick a different sport.")
+    st.stop()
 
 tab_data, tab_dist, tab_kf, tab_strat = st.tabs(
     ["Data", "Distributions", "Kalman filter", "Strategy & Sharpe"]
@@ -159,10 +172,11 @@ with tab_kf:
                 fill="toself", opacity=0.15, line=dict(width=0),
                 name=f"{t} ±1σ", showlegend=False,
             ))
-            true_series = mf.strengths[t].reindex(trace.timestamps).interpolate()
-            fig.add_trace(go.Scatter(x=trace.timestamps, y=true_series,
-                                     mode="lines", line=dict(dash="dot"),
-                                     name=f"{t} true (latent)"))
+            if not mf.strengths.empty and t in mf.strengths.columns:
+                true_series = mf.strengths[t].reindex(trace.timestamps).interpolate()
+                fig.add_trace(go.Scatter(x=trace.timestamps, y=true_series,
+                                         mode="lines", line=dict(dash="dot"),
+                                         name=f"{t} EWMA margin"))
         fig.update_layout(height=460, xaxis_title="Date", yaxis_title="Strength")
         st.plotly_chart(fig, use_container_width=True)
 

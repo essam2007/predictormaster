@@ -1,114 +1,40 @@
-"""Deterministic synthetic match data per (sport, date range, seed).
+"""Dashboard data layer — real public APIs, no synthetic generation.
 
-The generator is intentionally simple but calibrated per sport: latent team
-strengths follow an Ornstein-Uhlenbeck process (matches the platform's OU
-spec in docs/derivations/ou_strength.md), and per-match scores are drawn
-from sport-appropriate distributions:
+Public surface kept stable so dashboards/strategy.py is untouched:
 
-* nba / nfl: Normal(mu, sigma) per team, sigma per league.
-* epl / soccer / mlb / nhl: Poisson(lambda) per team.
-
-Swap in a real loader by replacing ``generate_matches`` with a function that
-returns the same MatchFrame dataclass — the dashboards do not care where the
-data came from.
+  SPORTS                         tuple[str, ...]
+  generate_matches(sport, start, end, *, seed=0) -> MatchFrame
+      Now a real-data loader. ``seed`` is accepted for backwards-compat
+      with the old Streamlit signature but is ignored — there is no
+      randomness when reading historical games.
+  run_kalman(mf, *, q, r)        -> FilterTrace
+  simulate_strategy(...)         -> StrategyResult
+      Bets at the *actual* moneyline odds where the data source provides
+      them (EPL: closing Bet365/Pinnacle/etc. averaged; NFL/NBA/NCAA:
+      ESPN-published consensus). Where odds are missing the bet is
+      skipped — no synthetic market prices.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 
 import numpy as np
 import pandas as pd
 
-SPORTS = ("nba", "nfl", "epl", "mlb", "nhl")
+from predictormaster.data.loaders import SPORTS as _SPORTS
+from predictormaster.data.loaders import MatchFrame, load_matches
+from predictormaster.models.kalman import team_strength_filter
 
-_TEAMS = {
-    "nba": ["Lakers", "Warriors", "Celtics", "Heat", "Bucks", "Nuggets",
-            "Suns", "76ers", "Mavericks", "Nets", "Clippers", "Knicks"],
-    "nfl": ["Chiefs", "Bills", "Eagles", "49ers", "Cowboys", "Bengals",
-            "Ravens", "Lions", "Dolphins", "Packers", "Vikings", "Jets"],
-    "epl": ["Arsenal", "Man City", "Liverpool", "Chelsea", "Tottenham",
-            "Man United", "Newcastle", "Brighton", "Aston Villa", "West Ham"],
-    "mlb": ["Dodgers", "Yankees", "Astros", "Braves", "Phillies",
-            "Rangers", "Orioles", "Mets", "Padres", "Cubs"],
-    "nhl": ["Avalanche", "Rangers", "Bruins", "Oilers", "Hurricanes",
-            "Maple Leafs", "Stars", "Panthers", "Devils", "Kings"],
-}
+SPORTS = _SPORTS
 
-_SCORING = {
-    "nba": {"kind": "normal", "mu": 112.0, "sigma": 11.0, "edge_per_strength": 5.0},
-    "nfl": {"kind": "normal", "mu": 23.0, "sigma": 8.0, "edge_per_strength": 4.0},
-    "epl": {"kind": "poisson", "lam": 1.4, "edge_per_strength": 0.6},
-    "mlb": {"kind": "poisson", "lam": 4.5, "edge_per_strength": 0.8},
-    "nhl": {"kind": "poisson", "lam": 3.1, "edge_per_strength": 0.7},
-}
-
-_GAMES_PER_WEEK = {"nba": 3, "nfl": 1, "epl": 1, "mlb": 5, "nhl": 3}
-
-
-@dataclass(frozen=True)
-class MatchFrame:
-    sport: str
-    matches: pd.DataFrame  # date, home, away, home_score, away_score, true_strength_home, true_strength_away
-    strengths: pd.DataFrame  # date x team — true latent strengths
-
-
-def _ou_strengths(
-    n_days: int, teams: list[str], rng: np.random.Generator,
-    *, theta: float = 0.05, mu: float = 0.0, sigma: float = 0.15,
-) -> pd.DataFrame:
-    n_teams = len(teams)
-    x = rng.normal(0.0, 0.5, size=n_teams)
-    series = np.zeros((n_days, n_teams))
-    for t in range(n_days):
-        x = x + theta * (mu - x) + sigma * rng.standard_normal(n_teams)
-        series[t] = x
-    return pd.DataFrame(series, columns=teams)
+# Keep MatchFrame importable here for any caller that imports from dashboards._data.
+MatchFrame = MatchFrame  # noqa: PLW0127  (re-export)
 
 
 def generate_matches(sport: str, start: date, end: date, *, seed: int = 0) -> MatchFrame:
-    if sport not in _TEAMS:
-        raise ValueError(f"unknown sport {sport!r}; choose one of {SPORTS}")
-    if end <= start:
-        raise ValueError("end must be after start")
-
-    rng = np.random.default_rng(seed)
-    teams = list(_TEAMS[sport])
-    n_days = (end - start).days
-    strengths = _ou_strengths(n_days, teams, rng)
-    strengths.index = pd.to_datetime([start + timedelta(days=i) for i in range(n_days)])
-
-    cfg = _SCORING[sport]
-    n_per_week = _GAMES_PER_WEEK[sport]
-    schedule_dates = pd.date_range(start, end - timedelta(days=1), freq="D")
-    rows = []
-    for d in schedule_dates:
-        if rng.random() > n_per_week / 7.0:
-            continue
-        # one or two matches per matchday
-        for _ in range(rng.integers(1, 3)):
-            i, j = rng.choice(len(teams), size=2, replace=False)
-            home, away = teams[i], teams[j]
-            sh = strengths.loc[d, home]
-            sa = strengths.loc[d, away]
-            edge = cfg["edge_per_strength"] * (sh - sa)
-            if cfg["kind"] == "normal":
-                hs = rng.normal(cfg["mu"] + edge, cfg["sigma"])
-                as_ = rng.normal(cfg["mu"] - edge, cfg["sigma"])
-                home_score = max(0.0, hs)
-                away_score = max(0.0, as_)
-            else:
-                lam_h = max(0.05, cfg["lam"] + edge)
-                lam_a = max(0.05, cfg["lam"] - edge)
-                home_score = float(rng.poisson(lam_h))
-                away_score = float(rng.poisson(lam_a))
-            rows.append({
-                "date": d, "home": home, "away": away,
-                "home_score": home_score, "away_score": away_score,
-                "true_strength_home": float(sh), "true_strength_away": float(sa),
-            })
-    matches = pd.DataFrame(rows).sort_values("date").reset_index(drop=True)
-    return MatchFrame(sport=sport, matches=matches, strengths=strengths)
+    """Real public-API loader. ``seed`` accepted for signature parity."""
+    return load_matches(sport, start, end)
 
 
 @dataclass(frozen=True)
@@ -121,31 +47,48 @@ class FilterTrace:
     kalman_gain_diag: np.ndarray  # T x n_teams (diag of K)
 
 
-def run_kalman(mf: MatchFrame, *, q: float, r: float) -> FilterTrace:
-    """Run the platform's KalmanFilter on per-day score-margin observations."""
-    from predictormaster.models.kalman import team_strength_filter
+def _team_universe(mf: MatchFrame) -> list[str]:
+    if not mf.strengths.empty:
+        return list(mf.strengths.columns)
+    if mf.matches.empty:
+        return []
+    return sorted(set(mf.matches["home"]) | set(mf.matches["away"]))
 
-    teams = list(mf.strengths.columns)
+
+def _obs_scale(sport: str) -> float:
+    return 1.0 if sport in {"epl", "mlb", "nhl"} else 10.0
+
+
+def run_kalman(mf: MatchFrame, *, q: float, r: float) -> FilterTrace:
+    teams = _team_universe(mf)
+    if not teams or mf.matches.empty:
+        empty = np.zeros((0, max(len(teams), 1)))
+        return FilterTrace(
+            teams=teams,
+            timestamps=pd.DatetimeIndex([]),
+            posterior_mean=empty, posterior_var=empty,
+            innovation=empty, kalman_gain_diag=empty,
+        )
     idx = {t: i for i, t in enumerate(teams)}
     n = len(teams)
     kf = team_strength_filter(n, q=q, r=r)
-
     days = sorted(mf.matches["date"].unique())
     T = len(days)
     means = np.zeros((T, n))
     vars_ = np.zeros((T, n))
     innovs = np.zeros((T, n))
     gains = np.zeros((T, n))
-
+    scale = _obs_scale(mf.sport)
     for t, d in enumerate(days):
         kf.predict()
         day_matches = mf.matches[mf.matches["date"] == d]
-        y = kf.x.copy()  # default observation = prior, so unobserved teams aren't pulled
+        y = kf.x.copy()
         seen = np.zeros(n, dtype=bool)
         for _, row in day_matches.iterrows():
-            i, j = idx[row["home"]], idx[row["away"]]
+            i, j = idx.get(row["home"]), idx.get(row["away"])
+            if i is None or j is None:
+                continue
             margin = row["home_score"] - row["away_score"]
-            scale = 1.0 if mf.sport in {"epl", "mlb", "nhl"} else 10.0
             obs = margin / scale
             y[i] = obs / 2.0
             y[j] = -obs / 2.0
@@ -158,7 +101,6 @@ def run_kalman(mf: MatchFrame, *, q: float, r: float) -> FilterTrace:
         vars_[t] = np.diag(kf.P)
         innovs[t] = (y - prior_mean) * seen
         gains[t] = np.diag(K)
-
     return FilterTrace(
         teams=teams,
         timestamps=pd.DatetimeIndex(days),
@@ -171,17 +113,40 @@ def run_kalman(mf: MatchFrame, *, q: float, r: float) -> FilterTrace:
 
 @dataclass(frozen=True)
 class StrategyResult:
-    bets: pd.DataFrame  # per-bet pnl, edge, stake
+    bets: pd.DataFrame
     equity: pd.Series
     sharpe: float
     sortino: float
     max_drawdown: float
     win_rate: float
     n_bets: int
+    closing_line_value: float
+    note: str
 
 
-def _logistic(x: np.ndarray | float) -> np.ndarray | float:
+def _logistic(x: float) -> float:
     return 1.0 / (1.0 + np.exp(-x))
+
+
+def _american_to_decimal(ml: float) -> float:
+    if ml > 0:
+        return 1.0 + ml / 100.0
+    return 1.0 + 100.0 / abs(ml)
+
+
+def _to_decimal(value: float | None, sport: str) -> float | None:
+    if value is None or not np.isfinite(value):
+        return None
+    if sport == "epl":
+        return float(value) if value > 1.0 else None
+    return _american_to_decimal(float(value))
+
+
+def _devig(p_home: float, p_away: float) -> tuple[float, float]:
+    s = p_home + p_away
+    if s <= 0:
+        return p_home, p_away
+    return p_home / s, p_away / s
 
 
 def simulate_strategy(
@@ -190,72 +155,98 @@ def simulate_strategy(
     *,
     edge_threshold: float = 0.03,
     bet_fraction: float = 0.02,
-    bookmaker_juice: float = 0.05,
+    bookmaker_juice: float = 0.0,  # accepted for signature parity; real juice comes from the data
     seed: int = 1,
 ) -> StrategyResult:
-    """Bet whenever the Kalman-implied home-win probability differs from a
-    noisier 'market' price by more than ``edge_threshold``. Stakes are a flat
-    fraction of bankroll. Returns equity curve, Sharpe, Sortino, and max DD.
-    """
-    rng = np.random.default_rng(seed)
+    if mf.matches.empty or len(trace.teams) == 0:
+        empty = pd.DataFrame()
+        return StrategyResult(
+            bets=empty, equity=pd.Series(dtype=float),
+            sharpe=0.0, sortino=0.0, max_drawdown=0.0, win_rate=0.0,
+            n_bets=0, closing_line_value=0.0,
+            note="no completed matches in range",
+        )
     teams = trace.teams
     idx = {t: i for i, t in enumerate(teams)}
     day_to_t = {d: i for i, d in enumerate(trace.timestamps)}
 
-    cfg = _SCORING[mf.sport]
+    # Heuristic margin scale per sport for the model probability map.
+    sigma_map = {"nba": 11.0, "nfl": 8.0, "ncaaf": 12.0, "ncaab": 9.0,
+                 "mlb": 3.0, "nhl": 1.6, "epl": 1.3}
+    sigma = sigma_map.get(mf.sport, 5.0)
+
     rows = []
     bankroll = 1.0
     equity = []
     dates = []
+    skipped_no_odds = 0
 
     for _, row in mf.matches.iterrows():
         d = row["date"]
         t = day_to_t.get(d)
         if t is None or t < 5:
             continue
-        i, j = idx[row["home"]], idx[row["away"]]
-        prior_strength = trace.posterior_mean[t - 1, i] - trace.posterior_mean[t - 1, j]
-        edge_signal = cfg["edge_per_strength"] * prior_strength
-        if cfg["kind"] == "normal":
-            p_home = float(_logistic(edge_signal / cfg["sigma"]))
-        else:
-            p_home = float(_logistic(edge_signal))
+        i, j = idx.get(row["home"]), idx.get(row["away"])
+        if i is None or j is None:
+            continue
+        margin_pred = (trace.posterior_mean[t - 1, i] - trace.posterior_mean[t - 1, j]) * _obs_scale(mf.sport)
+        p_home_model = float(_logistic(margin_pred / sigma))
 
-        # Synthetic market price: true probability + bookmaker juice + noise.
-        true_edge = cfg["edge_per_strength"] * (row["true_strength_home"] - row["true_strength_away"])
-        if cfg["kind"] == "normal":
-            true_p = float(_logistic(true_edge / cfg["sigma"]))
-        else:
-            true_p = float(_logistic(true_edge))
-        market_p = np.clip(true_p + rng.normal(0, 0.05) + bookmaker_juice * 0.5, 0.02, 0.98)
-
-        edge = p_home - market_p
-        if abs(edge) < edge_threshold:
+        dec_home = _to_decimal(row.get("moneyline_home"), mf.sport)
+        dec_away = _to_decimal(row.get("moneyline_away"), mf.sport)
+        if dec_home is None or dec_away is None:
+            skipped_no_odds += 1
             equity.append(bankroll)
             dates.append(d)
             continue
 
-        side = "home" if edge > 0 else "away"
-        won = row["home_score"] > row["away_score"] if side == "home" else row["home_score"] < row["away_score"]
-        # Decimal odds derived from market (with juice baked in).
-        market_used = market_p if side == "home" else (1 - market_p)
-        odds = (1.0 / market_used) * (1.0 - bookmaker_juice)
+        raw_p_home = 1.0 / dec_home
+        raw_p_away = 1.0 / dec_away
+        market_home, market_away = _devig(raw_p_home, raw_p_away)
+        edge_home = p_home_model - market_home
+        edge_away = (1.0 - p_home_model) - market_away
+
+        if max(abs(edge_home), abs(edge_away)) < edge_threshold:
+            equity.append(bankroll)
+            dates.append(d)
+            continue
+
+        if edge_home >= edge_away:
+            side = "home"
+            edge = edge_home
+            dec = dec_home
+            market_p = market_home
+            won = row["home_score"] > row["away_score"]
+        else:
+            side = "away"
+            edge = edge_away
+            dec = dec_away
+            market_p = market_away
+            won = row["away_score"] > row["home_score"]
+
         stake = bet_fraction * bankroll
-        pnl = stake * (odds - 1.0) if won else -stake
+        pnl = stake * (dec - 1.0) if won else -stake
         bankroll += pnl
         rows.append({
             "date": d, "home": row["home"], "away": row["away"], "side": side,
-            "edge": edge, "stake": stake, "odds": odds, "won": bool(won), "pnl": pnl,
-            "bankroll": bankroll,
+            "edge": edge, "stake": stake, "odds": dec,
+            "market_p": market_p, "model_p": p_home_model if side == "home" else 1 - p_home_model,
+            "won": bool(won), "pnl": pnl, "bankroll": bankroll,
         })
         equity.append(bankroll)
         dates.append(d)
 
     bets = pd.DataFrame(rows)
     eq = pd.Series(equity, index=pd.DatetimeIndex(dates), name="equity").groupby(level=0).last()
+    note_parts = [f"source: {mf.source}"]
+    if skipped_no_odds:
+        note_parts.append(f"skipped {skipped_no_odds} games with no odds in the free feed")
+    note = "; ".join(note_parts)
     if len(bets) < 2:
-        return StrategyResult(bets=bets, equity=eq, sharpe=0.0, sortino=0.0,
-                              max_drawdown=0.0, win_rate=0.0, n_bets=len(bets))
+        return StrategyResult(
+            bets=bets, equity=eq, sharpe=0.0, sortino=0.0, max_drawdown=0.0,
+            win_rate=0.0, n_bets=len(bets), closing_line_value=0.0, note=note,
+        )
     daily_ret = eq.pct_change().dropna()
     sharpe = float(daily_ret.mean() / (daily_ret.std() + 1e-12) * np.sqrt(252))
     downside = daily_ret[daily_ret < 0].std()
@@ -263,7 +254,9 @@ def simulate_strategy(
     running_max = eq.cummax()
     max_dd = float((eq / running_max - 1.0).min())
     win_rate = float(bets["won"].mean())
+    clv = float((bets["model_p"] - bets["market_p"]).mean())
     return StrategyResult(
         bets=bets, equity=eq, sharpe=sharpe, sortino=sortino,
         max_drawdown=max_dd, win_rate=win_rate, n_bets=len(bets),
+        closing_line_value=clv, note=note,
     )
