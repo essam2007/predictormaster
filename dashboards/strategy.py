@@ -54,18 +54,18 @@ with st.sidebar:
     juice = st.slider("Bookmaker juice", 0.0, 0.10, 0.05, step=0.005)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner="loading real games from public APIs…")
 def _load(sport: str, start: date, end: date, seed: int):
     return generate_matches(sport, start, end, seed=seed)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner="running Kalman filter…")
 def _kalman(sport: str, start: date, end: date, seed: int, q: float, r: float):
     mf = _load(sport, start, end, seed)
     return mf, run_kalman(mf, q=q, r=r)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner="simulating strategy…")
 def _strategy(sport, start, end, seed, q, r, edge_threshold, bet_fraction, juice):
     mf, trace = _kalman(sport, start, end, seed, q, r)
     return simulate_strategy(
@@ -77,8 +77,13 @@ def _strategy(sport, start, end, seed, q, r, edge_threshold, bet_fraction, juice
     )
 
 
-mf = _load(sport, start, end, int(seed))
-mf, trace = _kalman(sport, start, end, int(seed), q, r)
+try:
+    mf = _load(sport, start, end, int(seed))
+    mf, trace = _kalman(sport, start, end, int(seed), q, r)
+except Exception as e:
+    st.error(f"Failed to load data for {sport} {start} → {end}.")
+    st.exception(e)
+    st.stop()
 
 st.caption(f"data source: {getattr(mf, 'source', 'unknown')} · {len(mf.matches)} completed games")
 if mf.matches.empty:

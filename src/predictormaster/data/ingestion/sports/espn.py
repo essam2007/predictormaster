@@ -106,20 +106,32 @@ def _parse_event(sport: str, ev: dict) -> Game | None:
     )
 
 
-def _daterange(start: date, end: date) -> Iterable[date]:
+def _chunks(start: date, end: date, days: int) -> Iterable[tuple[date, date]]:
     d = start
     while d < end:
-        yield d
-        d += timedelta(days=1)
+        nxt = min(d + timedelta(days=days), end)
+        yield d, nxt - timedelta(days=1)
+        d = nxt
 
 
-def fetch_games(sport: str, start: date, end: date, *, cache: HTTPCache | None = None) -> list[Game]:
+def fetch_games(
+    sport: str,
+    start: date,
+    end: date,
+    *,
+    cache: HTTPCache | None = None,
+    chunk_days: int = 14,
+) -> list[Game]:
     if sport not in _BASE:
         raise ValueError(f"ESPN adapter does not cover sport={sport!r}")
     c = cache or default_cache()
     seen: dict[str, Game] = {}
-    for d in _daterange(start, end):
-        body = c.get_json(_BASE[sport], {"dates": d.strftime("%Y%m%d"), "limit": 300})
+    for a, b in _chunks(start, end, chunk_days):
+        if a == b:
+            dates_param = a.strftime("%Y%m%d")
+        else:
+            dates_param = f"{a.strftime('%Y%m%d')}-{b.strftime('%Y%m%d')}"
+        body = c.get_json(_BASE[sport], {"dates": dates_param, "limit": 1000})
         if not isinstance(body, dict):
             continue
         for ev in body.get("events") or []:
