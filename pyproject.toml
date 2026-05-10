@@ -80,6 +80,7 @@ ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "dashboards/strategy.py" = ["E402"]
+"dashboards/pages/*.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.10"
