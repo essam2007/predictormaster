@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: pm
+      POSTGRES_PASSWORD: pm
+      POSTGRES_DB: pm
+    ports: ["5432:5432"]
+    volumes: ["timescale-data:/var/lib/postgresql/data"]
+
+  redpanda:
+    image: redpandadata/redpanda:latest
+    command: >
+      redpanda start
+      --smp 1
+      --memory 1G
+      --reserve-memory 0M
+      --overprovisioned
+      --node-id 0
+      --check=false
+      --kafka-addr PLAINTEXT://0.0.0.0:9092
+      --advertise-kafka-addr PLAINTEXT://redpanda:9092
+    ports: ["9092:9092"]
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.11.3
+    command: >
+      mlflow server
+      --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    ports: ["5000:5000"]
+    volumes: ["mlflow-data:/mlflow"]
+
+  api:
+    build: .
+    depends_on: [redis, redpanda, mlflow]
+    environment:
+      FS_ONLINE_URL: "redis://redis:6379/0"
+      KAFKA_BOOTSTRAP: "redpanda:9092"
+      MLFLOW_TRACKING_URI: "http://mlflow:5000"
+    ports: ["8000:8000"]
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    ports: ["3000:3000"]
+
+volumes:
+  timescale-data:
+  mlflow-data:

@@ -1,0 +1,21 @@
+sources:
+  - name: match_results
+    base_url: https://api.example.com/sports/v2
+    refresh_seconds: 60
+    latency_budget_seconds: 30
+  - name: injury_reports
+    base_url: https://api.example.com/sports/v2
+    refresh_seconds: 30
+    latency_budget_seconds: 60
+  - name: weather
+    base_url: https://api.weather.example.com/v1
+    refresh_seconds: 600
+    latency_budget_seconds: 15
+  - name: public_consensus
+    base_url: https://api.consensus.example.com/v1
+    refresh_seconds: 15
+    latency_budget_seconds: 20
+  - name: social_firehose
+    transport: kafka
+    topic: pm.social.firehose
+    latency_budget_ms: 500

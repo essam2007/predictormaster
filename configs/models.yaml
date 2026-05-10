@@ -1,0 +1,41 @@
+dixon_coles:
+  xi: 0.0065        # ~10-week half-life (Dixon-Coles temporal weighting)
+  max_goals: 10
+
+bayesian_hierarchical:
+  draws: 1000
+  tune: 1000
+  chains: 4
+
+elo:
+  k: 20
+  scale: 400
+  home_advantage: 60
+  initial_rating: 1500
+
+glicko2:
+  tau: 0.5
+
+gbm_ensemble:
+  n_rounds: 800
+  early_stopping_rounds: 50
+  monotone_constraints:
+    home_form_30d: 1
+    away_form_30d: -1
+    rest_days_diff: 1
+    travel_distance_km: -1
+
+meta_stack:
+  l1: 1e-3
+  l2: 1e-3
+
+drift:
+  page_hinkley:
+    threshold: 50.0
+    delta: 0.005
+  adwin:
+    delta: 0.002
+
+calibration_gate:
+  ece_max: 0.05
+  bss_climatology_min: 0.05

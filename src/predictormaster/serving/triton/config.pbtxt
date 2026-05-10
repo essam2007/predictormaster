@@ -1,0 +1,33 @@
+name: "pm_meta_ensemble"
+platform: "python"
+max_batch_size: 256
+input [
+  {
+    name: "features"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "probabilities"
+    data_type: TYPE_FP32
+    dims: [ 3 ]
+  },
+  {
+    name: "epistemic_var"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
+instance_group [
+  { count: 2  kind: KIND_GPU }
+]
+dynamic_batching {
+  preferred_batch_size: [ 32, 64, 128 ]
+  max_queue_delay_microseconds: 1000
+}
+parameters {
+  key: "EXECUTION_ENV_PATH"
+  value: { string_value: "/opt/triton/envs/predictormaster" }
+}
