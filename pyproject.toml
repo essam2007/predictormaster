@@ -50,6 +50,9 @@ dashboard = [
     "streamlit>=1.30",
     "plotly>=5.18",
 ]
+execution = [
+    "py-clob-client>=0.34",
+]
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
