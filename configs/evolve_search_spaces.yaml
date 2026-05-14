@@ -1,0 +1,42 @@
+# Pre-registered search spaces for alpha evolution.
+#
+# Editing this file IS NOT a runtime parameter — these bounds are
+# fixed before each evolution run begins and are committed to git so
+# the "I'll just widen the bounds when the candidate looks promising"
+# anti-pattern is checkable in PR review.
+#
+# Any change to bounds resets the multi-test trial counter for that
+# strategy. Treat a bounds-edit as a new experiment.
+
+alpha3_daily:
+  # α3-daily: sentiment-conditioned EPL outcome bet.
+  # NOTE this is a daily-frequency proxy for α3 — real α3 needs
+  # intra-day shock decay against intra-day book snapshots. This
+  # configuration evolves the SIGNAL hyperparameters only; the market
+  # reference is the de-vigged closing-line odds (one shot per match).
+  name: alpha3_daily
+  genes:
+    - {name: z_threshold,            kind: continuous,  lo: 0.5,  hi: 3.5,  mutation_scale: 0.15}
+    - {name: sentiment_lookback_days, kind: integer,    lo: 1,    hi: 21}
+    - {name: half_life_days,         kind: integer,     lo: 1,    hi: 14}
+    - {name: min_observations,       kind: integer,     lo: 2,    hi: 12}
+    - {name: market_p_lo,            kind: continuous,  lo: 0.05, hi: 0.45, mutation_scale: 0.1}
+    - {name: market_p_hi,            kind: continuous,  lo: 0.55, hi: 0.95, mutation_scale: 0.1}
+    - {name: side,                   kind: categorical, choices: [favorable, contrarian]}
+    - {name: bet_against_market,     kind: categorical, choices: [true, false]}
+
+alpha2_intra_poly:
+  # α2-poly: intra-Polymarket arb hyperparameters.
+  # Evaluation requires book snapshots logged by
+  # execution/book_snapshot_logger.py. Until ≥48h of snapshots
+  # accumulate, the evaluator runs in NO-DATA mode and returns
+  # empty results (zero fitness across the board).
+  name: alpha2_intra_poly
+  genes:
+    - {name: min_edge,               kind: continuous,  lo: 0.001, hi: 0.05, mutation_scale: 0.15}
+    - {name: fee_per_leg_assumption, kind: continuous,  lo: 0.005, hi: 0.04, mutation_scale: 0.1}
+    - {name: stake_fraction,         kind: continuous,  lo: 0.05,  hi: 0.95, mutation_scale: 0.1}
+    - {name: max_units_floor,        kind: integer,     lo: 1,     hi: 100}
+    - {name: hedge_attempts,         kind: integer,     lo: 0,     hi: 2}
+    - {name: scratch_tick_slippage,  kind: continuous,  lo: 0.0,   hi: 0.01, mutation_scale: 0.15}
+    - {name: abandon_if_book_empty,  kind: categorical, choices: [true, false]}
