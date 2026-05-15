@@ -146,6 +146,60 @@
       </div>
     </section>
 
+    <!-- Diagnostics: why aren't orders filling -->
+    <section class="bg-surface-800 rounded-lg border border-surface-700 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <div class="text-sm font-semibold">Fill diagnostics</div>
+          <div id="diag-verdict-summary" class="text-xs text-ink-400 mt-0.5">—</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="diag-verdict-pill" class="px-2 py-1 rounded text-[10px] font-medium bg-surface-700 text-ink-400 uppercase tracking-wider">—</span>
+          <button id="btn-refresh-sample" class="px-2 py-1 rounded text-[10px] bg-surface-700 hover:bg-surface-600 text-ink-200" title="Re-sample live Polymarket edges (~30s)">re-sample</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="space-y-1 text-xs">
+          <div class="text-ink-400 uppercase tracking-wider text-[10px] mb-1">Live edge sample</div>
+          <div class="flex justify-between"><span class="text-ink-400">best edge</span><span id="diag-best-edge" class="num">—</span></div>
+          <div class="flex justify-between"><span class="text-ink-400">median edge</span><span id="diag-median-edge" class="num">—</span></div>
+          <div class="flex justify-between"><span class="text-ink-400">edges ≥ 0.1%</span><span id="diag-n-1bp" class="num">—</span></div>
+          <div class="flex justify-between"><span class="text-ink-400">edges ≥ 0.5%</span><span id="diag-n-5bp" class="num">—</span></div>
+          <div class="flex justify-between"><span class="text-ink-400">markets sampled</span><span id="diag-n-markets" class="num">—</span></div>
+          <div id="diag-sample-age" class="text-ink-600 text-[10px] mt-1">—</div>
+        </div>
+        <div class="md:col-span-2 space-y-1 text-xs">
+          <div class="text-ink-400 uppercase tracking-wider text-[10px] mb-1">Top 5 closest-to-arb right now</div>
+          <table class="w-full text-[11px] num">
+            <thead><tr class="text-ink-400 text-left"><th class="font-normal py-1">edge</th><th class="font-normal py-1">ya</th><th class="font-normal py-1">na</th><th class="font-normal py-1 text-ink-400">question</th></tr></thead>
+            <tbody id="diag-top-table"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="diag-suggestions" class="mt-4 space-y-2"></div>
+    </section>
+
+    <!-- Snapshot logger -->
+    <section class="bg-surface-800 rounded-lg border border-surface-700 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <div class="text-sm font-semibold">Book-snapshot logger <span class="text-ink-600 text-[10px] ml-1">α2 evolution data</span></div>
+          <div id="logger-status-text" class="text-xs text-ink-400 mt-0.5">stopped</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="logger-pill" class="px-2 py-1 rounded text-[10px] font-medium bg-surface-700 text-ink-400 uppercase tracking-wider">off</span>
+          <button id="btn-logger-start" class="px-3 py-1 rounded text-xs bg-accent-blue/15 text-accent-blue border border-accent-blue/30 hover:bg-accent-blue/25">START</button>
+          <button id="btn-logger-stop" class="px-3 py-1 rounded text-xs bg-accent-red/15 text-accent-red border border-accent-red/30 hover:bg-accent-red/25 disabled:opacity-40" disabled>STOP</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <div><div class="text-ink-400 text-[10px] uppercase tracking-wider">files</div><div id="logger-files" class="num text-base mt-0.5">—</div></div>
+        <div><div class="text-ink-400 text-[10px] uppercase tracking-wider">size</div><div id="logger-bytes" class="num text-base mt-0.5">—</div></div>
+        <div><div class="text-ink-400 text-[10px] uppercase tracking-wider">snapshot int</div><div id="logger-snap-int" class="num text-base mt-0.5">—</div></div>
+        <div><div class="text-ink-400 text-[10px] uppercase tracking-wider">market limit</div><div id="logger-limit" class="num text-base mt-0.5">—</div></div>
+      </div>
+    </section>
+
     <!-- Reject-reason breakdown -->
     <section class="bg-surface-800 rounded-lg border border-surface-700 p-4">
       <div class="text-sm font-semibold mb-3">Top rejection reasons (all modes)</div>

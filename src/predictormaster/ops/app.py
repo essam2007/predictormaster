@@ -35,8 +35,9 @@ from pydantic import BaseModel, Field
 
 from ..execution.kill_switch import KillSwitch
 from .balance import fetch_balances
+from .diagnose import diagnose, sample_polymarket_edges
 from .metrics import compute_metrics, load_decisions, recent_decisions
-from .runner import LIVE_CONFIRMATION_TOKEN, RunnerManager
+from .runner import LIVE_CONFIRMATION_TOKEN, RunnerManager, SnapshotLoggerManager
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,12 @@ class TripRequest(BaseModel):
     reason: str = Field(..., min_length=1, max_length=200)
 
 
+class LoggerStartRequest(BaseModel):
+    snapshot_interval: float = Field(5.0, ge=1.0, le=60.0)
+    discovery_interval: float = Field(900.0, ge=60.0, le=3600.0)
+    market_limit: int = Field(80, ge=1, le=500)
+
+
 def _load_dotenv_into_env() -> None:
     env_path = PROJECT_ROOT / ".env"
     if not env_path.exists():
@@ -75,7 +82,11 @@ def _load_dotenv_into_env() -> None:
 async def lifespan(app: FastAPI):
     _load_dotenv_into_env()
     app.state.runner = RunnerManager(project_root=PROJECT_ROOT)
+    app.state.logger = SnapshotLoggerManager(project_root=PROJECT_ROOT)
     app.state.kill_switch = KillSwitch(kill_file=KILL_FILE)
+    # Diagnostic edge-sample cache (sampling takes ~30s; the dashboard
+    # polls cheaply and only triggers a fresh sample if cache is stale)
+    app.state.edge_sample_cache = {"value": None, "expires_at": 0.0}
     yield
 
 
@@ -156,6 +167,54 @@ def create_app() -> FastAPI:
         except OSError as e:
             raise HTTPException(500, detail=f"could not remove kill file: {e}") from e
         return app.state.kill_switch.status()
+
+    # ---------------- snapshot logger sidecar ----------------
+
+    @app.get("/api/logger/status")
+    def logger_status() -> dict:
+        return app.state.logger.status()
+
+    @app.get("/api/logger/stdout")
+    def logger_stdout(n: int = Query(60, ge=1, le=500)) -> dict:
+        return {"lines": app.state.logger.recent_stdout(n_lines=n)}
+
+    @app.post("/api/logger/start")
+    def logger_start(req: LoggerStartRequest) -> dict:
+        try:
+            return app.state.logger.start(
+                snapshot_interval=req.snapshot_interval,
+                discovery_interval=req.discovery_interval,
+                market_limit=req.market_limit,
+            )
+        except ValueError as e:
+            raise HTTPException(400, detail=str(e)) from e
+        except RuntimeError as e:
+            raise HTTPException(409, detail=str(e)) from e
+        except FileNotFoundError as e:
+            raise HTTPException(500, detail=str(e)) from e
+
+    @app.post("/api/logger/stop")
+    def logger_stop() -> dict:
+        return app.state.logger.stop()
+
+    # ---------------- diagnostics ----------------
+
+    @app.get("/api/diagnostics")
+    def diagnostics(refresh_sample: bool = Query(False)) -> dict:
+        """Why aren't orders filling? Returns a verdict + actionable
+        suggestions. The expensive part — sampling live PM edges —
+        is cached for 5 minutes (or refreshed on demand)."""
+        import time as _time
+        cache = app.state.edge_sample_cache
+        if refresh_sample or cache["value"] is None or _time.time() > cache["expires_at"]:
+            sample = sample_polymarket_edges(limit=80, timeout_seconds=70.0)
+            cache["value"] = sample
+            cache["expires_at"] = _time.time() + 300.0
+        report = diagnose(
+            journal_path=JOURNAL_PATH,
+            edge_sample=cache["value"],
+        )
+        return report.to_dict()
 
     # ---- static frontend ----
     if STATIC_DIR.exists():

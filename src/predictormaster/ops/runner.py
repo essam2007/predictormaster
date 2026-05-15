@@ -41,6 +41,8 @@ logger = logging.getLogger(__name__)
 LIVE_CONFIRMATION_TOKEN = "I UNDERSTAND THIS IS REAL MONEY"
 DEFAULT_STATE_PATH = Path("logs/.ops_runner_state.json")
 DEFAULT_LIVE_RUNNER = Path("scripts/live_runner.py")
+DEFAULT_LOGGER_SCRIPT = Path("scripts/run_snapshot_logger.py")
+DEFAULT_LOGGER_STATE_PATH = Path("logs/.ops_logger_state.json")
 
 
 @dataclass
@@ -122,8 +124,13 @@ class RunnerManager:
             if not script.exists():
                 raise FileNotFoundError(f"live_runner not found at {script}")
 
+            # ``python -u`` + PYTHONUNBUFFERED forces line-buffered output
+            # on the child's stdout/stderr. Without this, prints land in
+            # a block buffer that never flushes until the child exits —
+            # the dashboard then shows an empty log even though the bot
+            # is running. This bug burned hours of "zero fills?" debugging.
             args = [
-                sys.executable, str(script),
+                sys.executable, "-u", str(script),
                 "--mode", mode,
                 "--bankroll", str(bankroll),
                 "--max-stake", str(max_stake),
@@ -141,11 +148,13 @@ class RunnerManager:
             stdout_f.write(f"\n--- started {datetime.now(timezone.utc).isoformat()} mode={mode} ---\n")
             stderr_f.write(f"\n--- started {datetime.now(timezone.utc).isoformat()} mode={mode} ---\n")
 
+            env = {**os.environ, "PYTHONUNBUFFERED": "1"}
             proc = subprocess.Popen(
                 args, cwd=str(self.project_root),
                 stdout=stdout_f, stderr=stderr_f,
                 stdin=subprocess.DEVNULL,
                 start_new_session=True,
+                env=env,
             )
             self._proc = proc
             self._state = RunnerState(
@@ -194,6 +203,16 @@ class RunnerManager:
             return []
         return content[-n_lines:]
 
+    def recent_stderr(self, n_lines: int = 40) -> list[str]:
+        path = self.project_root / "logs" / "runner_stderr.log"
+        if not path.exists():
+            return []
+        try:
+            content = path.read_text(errors="replace").splitlines()
+        except OSError:
+            return []
+        return content[-n_lines:]
+
     # ---------------- state file ----------------
 
     def _state_file(self) -> Path:
@@ -229,3 +248,172 @@ class RunnerManager:
             self._proc = None
             self._state = RunnerState()
             self._save_state_locked()
+
+
+# ============================================================================
+# Snapshot-logger sidecar manager
+# ----------------------------------------------------------------------------
+# The book-snapshot logger runs as a long-lived sidecar alongside the runner.
+# Its responsibilities are completely independent (it records markets via
+# its own discovery loop) so we manage it with a dedicated, simpler class —
+# no live-mode confirmation, fewer knobs, single state file.
+# ============================================================================
+
+
+@dataclass
+class LoggerState:
+    pid: int | None = None
+    started_at_utc: str | None = None
+    snapshot_interval: float | None = None
+    discovery_interval: float | None = None
+    market_limit: int | None = None
+    output_dir: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {**self.__dict__}
+
+    def is_active(self) -> bool:
+        return self.pid is not None
+
+
+@dataclass
+class SnapshotLoggerManager:
+    project_root: Path
+    state_path: Path = DEFAULT_LOGGER_STATE_PATH
+    script_path: Path = DEFAULT_LOGGER_SCRIPT
+    _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
+    _state: LoggerState = field(default_factory=LoggerState, init=False, repr=False)
+    _proc: subprocess.Popen | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        sp = self.project_root / self.state_path
+        if not sp.exists():
+            return
+        try:
+            blob = json.loads(sp.read_text())
+        except (OSError, json.JSONDecodeError):
+            return
+        st = LoggerState(**{k: v for k, v in blob.items()
+                            if k in LoggerState.__annotations__})
+        if st.pid is not None and not _pid_alive(st.pid):
+            st = LoggerState()
+        self._state = st
+
+    def _save_locked(self) -> None:
+        sp = self.project_root / self.state_path
+        sp.parent.mkdir(parents=True, exist_ok=True)
+        sp.write_text(json.dumps(self._state.to_dict(), indent=2))
+
+    def _reconcile_locked(self) -> None:
+        if self._state.pid is None:
+            return
+        if not _pid_alive(self._state.pid):
+            self._proc = None
+            self._state = LoggerState()
+            self._save_locked()
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            self._reconcile_locked()
+            base = self._state.to_dict()
+            base["running"] = self._state.is_active()
+            base["pid_alive"] = (self._state.pid is not None
+                                 and _pid_alive(self._state.pid))
+            # diagnostic: snapshot count
+            snap_dir = (Path(self._state.output_dir)
+                        if self._state.output_dir
+                        else self.project_root / "logs" / "book_snapshots")
+            try:
+                files = list(snap_dir.glob("snap-*.jsonl")) if snap_dir.exists() else []
+                base["snapshot_files"] = len(files)
+                base["snapshot_bytes"] = sum(p.stat().st_size for p in files)
+            except OSError:
+                base["snapshot_files"] = None
+                base["snapshot_bytes"] = None
+            return base
+
+    def start(self, *, snapshot_interval: float = 5.0,
+              discovery_interval: float = 900.0,
+              market_limit: int = 80,
+              output_dir: Path | None = None) -> dict[str, Any]:
+        if snapshot_interval < 1.0:
+            raise ValueError("snapshot_interval must be ≥ 1s (PM rate limits)")
+        if discovery_interval < 60.0:
+            raise ValueError("discovery_interval must be ≥ 60s")
+        if not 1 <= market_limit <= 500:
+            raise ValueError("market_limit must be in [1, 500]")
+        outdir = output_dir or (self.project_root / "logs" / "book_snapshots")
+        with self._lock:
+            self._reconcile_locked()
+            if self._state.is_active():
+                raise RuntimeError(f"snapshot logger already running (pid={self._state.pid})")
+            script = self.project_root / self.script_path
+            if not script.exists():
+                raise FileNotFoundError(f"snapshot logger script not found at {script}")
+
+            args = [
+                sys.executable, "-u", str(script),
+                "--snapshot-interval", str(snapshot_interval),
+                "--discovery-interval", str(discovery_interval),
+                "--market-limit", str(market_limit),
+                "--output-dir", str(outdir),
+                "--verbose",
+            ]
+            log_dir = self.project_root / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            stdout_f = (log_dir / "snapshot_logger_stdout.log").open("a", buffering=1)
+            stderr_f = (log_dir / "snapshot_logger_stderr.log").open("a", buffering=1)
+            stdout_f.write(f"\n--- started {datetime.now(timezone.utc).isoformat()} ---\n")
+            stderr_f.write(f"\n--- started {datetime.now(timezone.utc).isoformat()} ---\n")
+            env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+            proc = subprocess.Popen(
+                args, cwd=str(self.project_root),
+                stdout=stdout_f, stderr=stderr_f,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+                env=env,
+            )
+            self._proc = proc
+            self._state = LoggerState(
+                pid=proc.pid,
+                started_at_utc=datetime.now(timezone.utc).isoformat(),
+                snapshot_interval=snapshot_interval,
+                discovery_interval=discovery_interval,
+                market_limit=market_limit,
+                output_dir=str(outdir),
+            )
+            self._save_locked()
+            logger.info("snapshot logger started pid=%d", proc.pid)
+            return self._state.to_dict()
+
+    def stop(self, *, timeout: float = 10.0) -> dict[str, Any]:
+        with self._lock:
+            self._reconcile_locked()
+            if not self._state.is_active():
+                return {"stopped": False, "reason": "not running"}
+            pid = self._state.pid
+            with contextlib.suppress(ProcessLookupError):
+                if self._proc is not None:
+                    self._proc.terminate()
+                else:
+                    os.kill(pid, signal.SIGTERM)
+            deadline = time.time() + timeout
+            while time.time() < deadline and _pid_alive(pid):
+                time.sleep(0.2)
+            if _pid_alive(pid):
+                with contextlib.suppress(ProcessLookupError):
+                    os.kill(pid, signal.SIGKILL)
+                time.sleep(0.5)
+            self._proc = None
+            self._state = LoggerState()
+            self._save_locked()
+            return {"stopped": True, "pid": pid}
+
+    def recent_stdout(self, n_lines: int = 60) -> list[str]:
+        path = self.project_root / "logs" / "snapshot_logger_stdout.log"
+        if not path.exists():
+            return []
+        try:
+            return path.read_text(errors="replace").splitlines()[-n_lines:]
+        except OSError:
+            return []

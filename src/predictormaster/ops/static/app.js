@@ -304,10 +304,165 @@ async function doKillSwitch() {
   }
 }
 
+// ---- diagnostics ----
+function fmtPctSigned(v, digits = 2) {
+  if (v === null || v === undefined || !Number.isFinite(v)) return "—";
+  const sign = v > 0 ? "+" : v < 0 ? "−" : "";
+  return `${sign}${Math.abs(v * 100).toFixed(digits)}%`;
+}
+
+function colourEdge(v) {
+  if (v === null || v === undefined || !Number.isFinite(v)) return "text-ink-400";
+  return v > 0 ? "text-accent-green" : "text-accent-red";
+}
+
+async function refreshDiagnostics({ refreshSample = false } = {}) {
+  try {
+    const path = refreshSample ? "/api/diagnostics?refresh_sample=true" : "/api/diagnostics";
+    const d = await api(path);
+    const pill = $("diag-verdict-pill");
+    const verdict = d.verdict || "unknown";
+    pill.textContent = verdict.replace(/_/g, " ");
+    pill.classList.remove("bg-accent-green/15", "text-accent-green", "border-accent-green/30",
+                          "bg-accent-red/15", "text-accent-red", "border-accent-red/30",
+                          "bg-accent-yellow/15", "text-accent-yellow", "border-accent-yellow/30",
+                          "bg-surface-700", "text-ink-400");
+    pill.classList.add("border");
+    if (verdict === "healthy") {
+      pill.classList.add("bg-accent-green/15", "text-accent-green", "border-accent-green/30");
+    } else if (verdict === "no_opportunity") {
+      pill.classList.add("bg-accent-red/15", "text-accent-red", "border-accent-red/30");
+    } else if (verdict === "params_too_tight" || verdict === "risk_gate_blocking") {
+      pill.classList.add("bg-accent-yellow/15", "text-accent-yellow", "border-accent-yellow/30");
+    } else {
+      pill.classList.add("bg-surface-700", "text-ink-400");
+    }
+    $("diag-verdict-summary").textContent = d.verdict_summary || "";
+
+    const s = d.edge_sample;
+    if (s) {
+      $("diag-best-edge").textContent = fmtPctSigned(s.best_edge, 3);
+      $("diag-best-edge").className = "num " + colourEdge(s.best_edge);
+      $("diag-median-edge").textContent = fmtPctSigned(s.median_edge, 3);
+      $("diag-n-1bp").textContent = s.edges_above_0pt1pct + " / " + s.n_pairs_with_books;
+      $("diag-n-5bp").textContent = s.edges_above_0pt5pct + " / " + s.n_pairs_with_books;
+      $("diag-n-markets").textContent = s.n_pairs_with_books;
+      try {
+        const dt = new Date(s.sampled_utc);
+        const age = Math.max(0, Math.floor((Date.now() - dt.getTime()) / 1000));
+        $("diag-sample-age").textContent = `sampled ${age}s ago · took ${s.sample_elapsed_s.toFixed(1)}s`;
+      } catch { /* leave as-is */ }
+      const tbody = $("diag-top-table");
+      tbody.innerHTML = (s.top_5_edges || []).map((r) => `
+        <tr><td class="${colourEdge(r.edge)} py-0.5">${fmtPctSigned(r.edge, 3)}</td>
+            <td class="py-0.5">${r.yes_ask.toFixed(4)}</td>
+            <td class="py-0.5">${r.no_ask.toFixed(4)}</td>
+            <td class="py-0.5 text-ink-200 truncate max-w-[28ch]" title="${escape(r.question)}">${escape(r.question)}</td></tr>
+      `).join("") || `<tr><td colspan="4" class="text-ink-600 py-2">no markets sampled</td></tr>`;
+    } else {
+      $("diag-best-edge").textContent = "—";
+      $("diag-median-edge").textContent = "—";
+      $("diag-n-1bp").textContent = "—";
+      $("diag-n-5bp").textContent = "—";
+      $("diag-n-markets").textContent = "—";
+      $("diag-sample-age").textContent = "no sample yet — click re-sample";
+      $("diag-top-table").innerHTML = "";
+    }
+
+    const sugDiv = $("diag-suggestions");
+    if (!d.suggestions || !d.suggestions.length) {
+      sugDiv.innerHTML = "";
+    } else {
+      sugDiv.innerHTML = d.suggestions.map((sg, i) => {
+        const hasParams = sg.params && Object.keys(sg.params).length > 0;
+        const applyBtn = hasParams
+          ? `<button data-idx="${i}" class="diag-apply-btn px-2 py-1 rounded text-[10px] bg-accent-blue/15 text-accent-blue border border-accent-blue/30 hover:bg-accent-blue/25">Apply…</button>`
+          : "";
+        return `<div class="border border-surface-700 rounded p-3 bg-surface-900/40">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1">
+              <div class="text-sm text-ink-50">${escape(sg.title)}</div>
+              <div class="text-xs text-ink-400 mt-1">${escape(sg.detail)}</div>
+            </div>
+            ${applyBtn}
+          </div>
+        </div>`;
+      }).join("");
+      sugDiv.querySelectorAll(".diag-apply-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const idx = parseInt(btn.dataset.idx, 10);
+          const params = d.suggestions[idx].params || {};
+          // open the Start modal with prefilled values
+          openModal();
+          if (params.min_edge !== undefined) $("f-min-edge").value = params.min_edge;
+          if (params.bankroll !== undefined) $("f-bankroll").value = params.bankroll;
+          if (params.max_stake !== undefined) $("f-max-stake").value = params.max_stake;
+          if (params.interval !== undefined) $("f-interval").value = params.interval;
+        });
+      });
+    }
+  } catch (e) {
+    console.warn("diagnostics error", e);
+  }
+}
+
+// ---- snapshot logger ----
+async function refreshLogger() {
+  try {
+    const s = await api("/api/logger/status");
+    if (s.running) {
+      $("logger-pill").textContent = "recording";
+      $("logger-pill").className = "px-2 py-1 rounded text-[10px] font-medium uppercase tracking-wider bg-accent-green/15 text-accent-green border border-accent-green/30";
+      $("logger-status-text").textContent = `pid ${s.pid} · ${fmt.time(s.started_at_utc)}`;
+      $("btn-logger-start").disabled = true;
+      $("btn-logger-stop").disabled = false;
+    } else {
+      $("logger-pill").textContent = "off";
+      $("logger-pill").className = "px-2 py-1 rounded text-[10px] font-medium uppercase tracking-wider bg-surface-700 text-ink-400";
+      $("logger-status-text").textContent = "stopped";
+      $("btn-logger-start").disabled = false;
+      $("btn-logger-stop").disabled = true;
+    }
+    $("logger-files").textContent = s.snapshot_files ?? "—";
+    $("logger-bytes").textContent = s.snapshot_bytes != null
+      ? (s.snapshot_bytes >= 1024 * 1024
+          ? (s.snapshot_bytes / 1024 / 1024).toFixed(1) + " MB"
+          : (s.snapshot_bytes / 1024).toFixed(0) + " KB")
+      : "—";
+    $("logger-snap-int").textContent = s.snapshot_interval ? s.snapshot_interval + "s" : "—";
+    $("logger-limit").textContent = s.market_limit ?? "—";
+  } catch (e) {
+    console.warn("logger status error", e);
+  }
+}
+
+async function doLoggerStart() {
+  try {
+    await api("/api/logger/start", {
+      method: "POST",
+      body: JSON.stringify({ snapshot_interval: 5.0, discovery_interval: 900.0, market_limit: 80 }),
+    });
+    await refreshLogger();
+  } catch (e) {
+    alert("logger start failed: " + e.message);
+  }
+}
+
+async function doLoggerStop() {
+  if (!confirm("Stop the snapshot logger? Existing snapshot files are preserved.")) return;
+  try {
+    await api("/api/logger/stop", { method: "POST" });
+    await refreshLogger();
+  } catch (e) {
+    alert("logger stop failed: " + e.message);
+  }
+}
+
 // ---- wire-up + polling ----
 function refreshAll() {
   return Promise.all([refreshStatus(), refreshBalance(), refreshMetrics(),
-                       refreshDecisions(), refreshStdout()]);
+                       refreshDecisions(), refreshStdout(),
+                       refreshDiagnostics(), refreshLogger()]);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -319,10 +474,16 @@ document.addEventListener("DOMContentLoaded", () => {
   $("btn-stop").addEventListener("click", doStop);
   $("btn-killswitch").addEventListener("click", doKillSwitch);
 
+  $("btn-refresh-sample").addEventListener("click", () => refreshDiagnostics({ refreshSample: true }));
+  $("btn-logger-start").addEventListener("click", doLoggerStart);
+  $("btn-logger-stop").addEventListener("click", doLoggerStop);
+
   refreshAll();
   setInterval(refreshStatus, POLL_MS_FAST);
   setInterval(refreshDecisions, POLL_MS_FAST);
   setInterval(refreshStdout, POLL_MS_FAST);
+  setInterval(refreshLogger, POLL_MS_FAST);
   setInterval(refreshMetrics, POLL_MS_SLOW);
   setInterval(refreshBalance, POLL_MS_SLOW);
+  setInterval(() => refreshDiagnostics(), POLL_MS_SLOW * 2);   // diagnostics every 30s
 });
