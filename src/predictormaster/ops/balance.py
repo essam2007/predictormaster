@@ -40,8 +40,15 @@ _ENV_RPC = os.environ.get("POLYGON_RPC")
 POLYGON_RPCS: list[str] = (
     [_ENV_RPC, *POLYGON_RPC_FALLBACKS] if _ENV_RPC else POLYGON_RPC_FALLBACKS
 )
-USDC_E_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"   # USDC.e on Polygon (legacy)
+# Polymarket-relevant tokens. The proxy holds **pUSD** post-deposit (the
+# raw USDC.e is held by the deposit relay only momentarily). pUSD is the
+# authoritative "Cash" balance shown in the Polymarket UI.
+PUSD_ADDRESS = "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb"   # Polymarket USD
+USDC_E_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"   # USDC.e (legacy)
+NATIVE_USDC_ADDRESS = "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"   # native USDC
 USDC_E_DECIMALS = 6
+PUSD_DECIMALS = 6
+NATIVE_USDC_DECIMALS = 6
 MATIC_DECIMALS = 18
 
 # function selector for balanceOf(address) = keccak256("balanceOf(address)")[:4]
@@ -50,7 +57,8 @@ BALANCE_OF_SELECTOR = "0x70a08231"
 
 @dataclass(frozen=True)
 class BalanceSnapshot:
-    proxy_usdc: float | None
+    proxy_pusd: float | None         # Polymarket internal wrapped USDC (the "Cash" UI shows)
+    proxy_usdc: float | None         # raw USDC.e on proxy — usually 0 after deposit forwards
     eoa_usdc: float | None
     eoa_matic: float | None
     proxy_address: str | None
@@ -59,11 +67,12 @@ class BalanceSnapshot:
 
     @classmethod
     def empty(cls) -> BalanceSnapshot:
-        return cls(None, None, None, None, None,
+        return cls(None, None, None, None, None, None,
                    datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict:
         return {
+            "proxy_pusd": self.proxy_pusd,
             "proxy_usdc": self.proxy_usdc,
             "eoa_usdc": self.eoa_usdc,
             "eoa_matic": self.eoa_matic,
@@ -118,15 +127,20 @@ def _rpc_call(method: str, params: list, *, timeout: float = 4.0) -> dict | None
     return None
 
 
-def _usdc_balance(address: str) -> float | None:
+def _erc20_balance(contract: str, address: str, decimals: int) -> float | None:
     body = _rpc_call("eth_call", [
-        {"to": USDC_E_ADDRESS, "data": _encoded_balance_call(address)},
+        {"to": contract, "data": _encoded_balance_call(address)},
         "latest",
     ])
     if body is None or "result" not in body:
         return None
     raw = _hex_to_int(body["result"])
-    return raw / (10 ** USDC_E_DECIMALS)
+    return raw / (10 ** decimals)
+
+
+def _usdc_balance(address: str) -> float | None:
+    """Back-compat wrapper for tests; returns USDC.e balance."""
+    return _erc20_balance(USDC_E_ADDRESS, address, USDC_E_DECIMALS)
 
 
 def _native_balance(address: str) -> float | None:
@@ -162,11 +176,15 @@ def fetch_balances() -> BalanceSnapshot:
     pk = os.environ.get("POLY_FUNDER_PK") or None
     eoa = _derive_eoa_from_pk(pk) if pk else None
 
+    proxy_pusd = (
+        _erc20_balance(PUSD_ADDRESS, proxy, PUSD_DECIMALS) if proxy else None
+    )
     proxy_usdc = _usdc_balance(proxy) if proxy else None
     eoa_usdc = _usdc_balance(eoa) if eoa else None
     eoa_matic = _native_balance(eoa) if eoa else None
 
     return BalanceSnapshot(
+        proxy_pusd=proxy_pusd,
         proxy_usdc=proxy_usdc,
         eoa_usdc=eoa_usdc,
         eoa_matic=eoa_matic,

@@ -111,6 +111,7 @@ def test_balance_returns_empty_when_rpc_fails(monkeypatch) -> None:
     monkeypatch.delenv("POLY_FUNDER_PK", raising=False)
     snap = balance_mod.fetch_balances()
     # No addresses configured → nothing to fetch
+    assert snap.proxy_pusd is None
     assert snap.proxy_usdc is None
     assert snap.eoa_matic is None
 

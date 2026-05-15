@@ -114,8 +114,15 @@ function formatUptime(sec) {
 async function refreshBalance() {
   try {
     const b = await api("/api/balance");
-    $("kpi-proxy-usdc").textContent = fmt.usd(b.proxy_usdc);
-    $("kpi-proxy-addr").textContent = fmt.addr(b.proxy_address);
+    // pUSD is Polymarket's wrapped USDC — this is the "Cash" the UI shows
+    // and what the risk gate actually sees. Raw USDC.e is shown as a sub-
+    // label only because it's usually $0 after the deposit-relay forwards.
+    $("kpi-proxy-pusd").textContent = fmt.usd(b.proxy_pusd);
+    const subParts = [`pUSD · ${fmt.addr(b.proxy_address)}`];
+    if (b.proxy_usdc !== null && b.proxy_usdc !== undefined && b.proxy_usdc > 0) {
+      subParts.push(`+ ${fmt.usd(b.proxy_usdc)} USDC.e unwrapped`);
+    }
+    $("kpi-proxy-addr").textContent = subParts.join("  ");
     $("kpi-eoa-matic").textContent = fmt.num(b.eoa_matic, 3);
   } catch (e) {
     console.warn("balance error", e);
