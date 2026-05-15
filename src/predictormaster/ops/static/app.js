@@ -440,11 +440,18 @@ async function doLoggerStart() {
   try {
     await api("/api/logger/start", {
       method: "POST",
-      body: JSON.stringify({ snapshot_interval: 5.0, discovery_interval: 900.0, market_limit: 80 }),
+      body: JSON.stringify({ snapshot_interval: 5.0, discovery_interval: 900.0, market_limit: 150 }),
     });
     await refreshLogger();
   } catch (e) {
-    alert("logger start failed: " + e.message);
+    // Server returns the full stderr tail inside the detail field —
+    // show it in a scrollable dialog rather than the truncated alert().
+    const w = window.open("", "_blank", "width=720,height=420");
+    if (w) {
+      w.document.write(`<pre style="background:#0b0d10;color:#f6f7fa;padding:14px;font:12px/1.5 monospace;white-space:pre-wrap;word-break:break-word;">logger start failed:\n\n${escape(e.message)}\n\nFix the underlying error, then click START again.</pre>`);
+    } else {
+      alert("logger start failed: " + e.message);
+    }
   }
 }
 

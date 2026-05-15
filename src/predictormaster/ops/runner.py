@@ -156,6 +156,19 @@ class RunnerManager:
                 start_new_session=True,
                 env=env,
             )
+            # Immediate-crash detection — see SnapshotLoggerManager.start
+            time.sleep(1.0)
+            if proc.poll() is not None:
+                try:
+                    stderr_tail = stderr_path.read_text(
+                        errors="replace"
+                    ).splitlines()[-15:]
+                except OSError:
+                    stderr_tail = []
+                raise RuntimeError(
+                    f"live_runner exited immediately with code {proc.returncode}. "
+                    f"stderr tail:\n  " + "\n  ".join(stderr_tail or ["(empty)"])
+                )
             self._proc = proc
             self._state = RunnerState(
                 pid=proc.pid, mode=mode,
@@ -373,6 +386,22 @@ class SnapshotLoggerManager:
                 start_new_session=True,
                 env=env,
             )
+            # Immediate-crash detection: a misconfigured logger (missing
+            # dep, bad cwd, syntax error) dies in <1s. Catch that here
+            # and surface the stderr tail in the error message — much
+            # better than letting it look "started" then flip to dead.
+            time.sleep(1.0)
+            if proc.poll() is not None:
+                try:
+                    stderr_tail = (log_dir / "snapshot_logger_stderr.log").read_text(
+                        errors="replace"
+                    ).splitlines()[-15:]
+                except OSError:
+                    stderr_tail = []
+                raise RuntimeError(
+                    f"snapshot logger exited immediately with code {proc.returncode}. "
+                    f"stderr tail:\n  " + "\n  ".join(stderr_tail or ["(empty)"])
+                )
             self._proc = proc
             self._state = LoggerState(
                 pid=proc.pid,

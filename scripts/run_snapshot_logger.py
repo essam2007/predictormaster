@@ -93,11 +93,17 @@ async def _supervise(
         try:
             tokens = await asyncio.to_thread(_discover_tokens, market_limit)
         except Exception as e:
+            # Surface to stdout (visible in dashboard's "snapshot logger
+            # stdout" panel) instead of only stderr — operators don't
+            # always look at both.
+            print(f"[logger] ERROR discovery failed: {type(e).__name__}: {e}",
+                  flush=True)
             logging.exception("discovery failed: %s", e)
             tokens = []
         if not tokens:
             print(f"[logger] {datetime.now(timezone.utc).isoformat()}  "
-                  f"discovery returned 0 tokens; sleeping {discovery_interval}s", flush=True)
+                  f"discovery returned 0 tokens; sleeping {discovery_interval}s "
+                  f"(check VPN / Polymarket Gamma reachability)", flush=True)
             with contextlib.suppress(asyncio.TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=discovery_interval)
             continue
