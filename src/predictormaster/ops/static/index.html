@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>predictormaster · ops</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          // soft trading-desk palette — readable on long sessions
+          surface: { 900: "#0b0d10", 800: "#11151b", 700: "#171c24",
+                     600: "#1f2632", 500: "#293141" },
+          ink:    { 50: "#f6f7fa", 200: "#d6dae3", 400: "#8893a8",
+                     600: "#5a6478" },
+          accent: { green: "#22d3a0", red: "#ef5a6f", yellow: "#f5c453",
+                    blue: "#4a8cff" },
+        },
+        fontFamily: { mono: ["JetBrains Mono", "ui-monospace", "monospace"] },
+      },
+    },
+  };
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  body { font-family: "Inter", system-ui, sans-serif; }
+  .num { font-variant-numeric: tabular-nums; font-family: "JetBrains Mono", monospace; }
+  .scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scrollbar::-webkit-scrollbar-thumb { background: #2a3242; border-radius: 4px; }
+</style>
+</head>
+<body class="bg-surface-900 text-ink-50 antialiased">
+  <!-- Top bar -->
+  <header class="border-b border-surface-700 bg-surface-800/80 backdrop-blur px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="h-2 w-2 rounded-full bg-accent-green" id="status-dot"></div>
+      <span class="font-semibold tracking-tight">predictormaster</span>
+      <span class="text-ink-400 text-sm">ops</span>
+      <span class="text-xs text-ink-400 ml-4" id="status-text">loading…</span>
+    </div>
+    <div class="flex items-center gap-3 text-sm">
+      <span id="ks-pill" class="px-2 py-1 rounded text-xs font-medium bg-surface-700 text-ink-400">kill switch: —</span>
+      <span id="creds-pill" class="px-2 py-1 rounded text-xs font-medium bg-surface-700 text-ink-400">creds: —</span>
+      <button id="btn-stop" class="px-3 py-1.5 rounded bg-accent-red/15 text-accent-red hover:bg-accent-red/25 border border-accent-red/30 text-xs font-medium disabled:opacity-40" disabled>STOP</button>
+      <button id="btn-start" class="px-3 py-1.5 rounded bg-accent-green/15 text-accent-green hover:bg-accent-green/25 border border-accent-green/30 text-xs font-medium">START…</button>
+    </div>
+  </header>
+
+  <main class="px-6 py-5 max-w-[1400px] mx-auto space-y-5">
+
+    <!-- KPI strip -->
+    <section class="grid grid-cols-2 md:grid-cols-6 gap-3">
+      <div class="bg-surface-800 rounded-lg p-4 border border-surface-700">
+        <div class="text-ink-400 text-xs uppercase tracking-wider">Proxy USDC</div>
+        <div id="kpi-proxy-usdc" class="num text-2xl font-semibold mt-1">—</div>
+        <div id="kpi-proxy-addr" class="text-ink-600 text-[10px] mt-1 truncate">—</div>
+      </div>
+      <div class="bg-surface-800 rounded-lg p-4 border border-surface-700">
+        <div class="text-ink-400 text-xs uppercase tracking-wider">EOA MATIC</div>
+        <div id="kpi-eoa-matic" class="num text-2xl font-semibold mt-1">—</div>
+        <div class="text-ink-600 text-[10px] mt-1">gas reserve</div>
+      </div>
+      <div class="bg-surface-800 rounded-lg p-4 border border-surface-700">
+        <div class="text-ink-400 text-xs uppercase tracking-wider">Total PnL</div>
+        <div id="kpi-pnl" class="num text-2xl font-semibold mt-1">—</div>
+        <div id="kpi-pnl-sub" class="text-ink-600 text-[10px] mt-1">paper + live</div>
+      </div>
+      <div class="bg-surface-800 rounded-lg p-4 border border-surface-700">
+        <div class="text-ink-400 text-xs uppercase tracking-wider">Sharpe (per-bet)</div>
+        <div id="kpi-sharpe" class="num text-2xl font-semibold mt-1">—</div>
+        <div class="text-ink-600 text-[10px] mt-1">ann · √200</div>
+      </div>
+      <div class="bg-surface-800 rounded-lg p-4 border border-surface-700">
+        <div class="text-ink-400 text-xs uppercase tracking-wider">Win rate</div>
+        <div id="kpi-winrate" class="num text-2xl font-semibold mt-1">—</div>
+        <div id="kpi-fills" class="text-ink-600 text-[10px] mt-1">— fills</div>
+      </div>
+      <div class="bg-surface-800 rounded-lg p-4 border border-surface-700">
+        <div class="text-ink-400 text-xs uppercase tracking-wider">Max DD</div>
+        <div id="kpi-dd" class="num text-2xl font-semibold mt-1">—</div>
+        <div class="text-ink-600 text-[10px] mt-1">$ on equity</div>
+      </div>
+    </section>
+
+    <!-- Per-mode breakdown -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div class="bg-surface-800 rounded-lg p-4 border border-surface-700">
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-semibold">shadow</div>
+          <div class="text-ink-600 text-[10px]">no orders submitted</div>
+        </div>
+        <div id="mode-shadow" class="mt-3 space-y-1 text-sm"></div>
+      </div>
+      <div class="bg-surface-800 rounded-lg p-4 border border-surface-700">
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-semibold">paper</div>
+          <div class="text-ink-600 text-[10px]">simulated fills</div>
+        </div>
+        <div id="mode-paper" class="mt-3 space-y-1 text-sm"></div>
+      </div>
+      <div class="bg-surface-800 rounded-lg p-4 border border-surface-700">
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-semibold text-accent-red">live</div>
+          <div class="text-ink-600 text-[10px]">real orders</div>
+        </div>
+        <div id="mode-live" class="mt-3 space-y-1 text-sm"></div>
+      </div>
+    </section>
+
+    <!-- Decisions table + runner log -->
+    <section class="grid grid-cols-1 lg:grid-cols-5 gap-3">
+      <div class="bg-surface-800 rounded-lg border border-surface-700 lg:col-span-3 overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-surface-700">
+          <div class="text-sm font-semibold">Recent decisions</div>
+          <div class="text-ink-600 text-[10px]" id="decisions-meta">—</div>
+        </div>
+        <div class="scrollbar overflow-auto max-h-[460px]">
+          <table class="w-full text-xs">
+            <thead class="text-ink-400 uppercase tracking-wider text-[10px] sticky top-0 bg-surface-800">
+              <tr class="border-b border-surface-700">
+                <th class="text-left px-3 py-2">time</th>
+                <th class="text-left px-3 py-2">α</th>
+                <th class="text-left px-3 py-2">mode</th>
+                <th class="text-left px-3 py-2">side</th>
+                <th class="text-right px-3 py-2">size</th>
+                <th class="text-right px-3 py-2">px</th>
+                <th class="text-right px-3 py-2">notl</th>
+                <th class="text-right px-3 py-2">pnl</th>
+                <th class="text-left px-3 py-2">status</th>
+              </tr>
+            </thead>
+            <tbody id="decisions-tbody" class="num"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="bg-surface-800 rounded-lg border border-surface-700 lg:col-span-2 overflow-hidden">
+        <div class="px-4 py-3 border-b border-surface-700 flex items-center justify-between">
+          <div class="text-sm font-semibold">runner stdout (tail)</div>
+          <div class="text-ink-600 text-[10px]" id="stdout-meta">—</div>
+        </div>
+        <pre id="stdout-pre" class="scrollbar overflow-auto max-h-[460px] text-[11px] text-ink-200 px-4 py-3 leading-relaxed whitespace-pre-wrap"></pre>
+      </div>
+    </section>
+
+    <!-- Reject-reason breakdown -->
+    <section class="bg-surface-800 rounded-lg border border-surface-700 p-4">
+      <div class="text-sm font-semibold mb-3">Top rejection reasons (all modes)</div>
+      <div id="reject-list" class="space-y-1 text-xs text-ink-200"></div>
+    </section>
+
+  </main>
+
+  <!-- Start modal -->
+  <div id="start-modal" class="hidden fixed inset-0 bg-surface-900/80 backdrop-blur-sm z-50 flex items-center justify-center px-4">
+    <div class="bg-surface-800 rounded-lg border border-surface-700 max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Start runner</h2>
+        <button id="modal-close" class="text-ink-400 hover:text-ink-50 text-xl leading-none">×</button>
+      </div>
+      <div class="space-y-3 text-sm">
+        <label class="block">
+          <span class="text-ink-400 text-xs uppercase tracking-wider">Mode</span>
+          <select id="f-mode" class="mt-1 w-full bg-surface-700 border border-surface-600 rounded px-3 py-2">
+            <option value="shadow">shadow (no orders)</option>
+            <option value="paper">paper (simulated fills)</option>
+            <option value="live">live (REAL ORDERS)</option>
+          </select>
+        </label>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="text-ink-400 text-xs uppercase tracking-wider">Bankroll $</span>
+            <input id="f-bankroll" type="number" value="15" min="1" step="1" class="num mt-1 w-full bg-surface-700 border border-surface-600 rounded px-3 py-2" />
+          </label>
+          <label class="block">
+            <span class="text-ink-400 text-xs uppercase tracking-wider">Max stake $</span>
+            <input id="f-max-stake" type="number" value="2" min="0.1" step="0.1" class="num mt-1 w-full bg-surface-700 border border-surface-600 rounded px-3 py-2" />
+          </label>
+          <label class="block">
+            <span class="text-ink-400 text-xs uppercase tracking-wider">Min edge</span>
+            <input id="f-min-edge" type="number" value="0.005" min="0" max="1" step="0.001" class="num mt-1 w-full bg-surface-700 border border-surface-600 rounded px-3 py-2" />
+          </label>
+          <label class="block">
+            <span class="text-ink-400 text-xs uppercase tracking-wider">Interval (s)</span>
+            <input id="f-interval" type="number" value="60" min="5" step="5" class="num mt-1 w-full bg-surface-700 border border-surface-600 rounded px-3 py-2" />
+          </label>
+        </div>
+        <div id="live-warning" class="hidden border border-accent-red/40 bg-accent-red/10 rounded p-3 space-y-2">
+          <div class="text-accent-red font-semibold">Live mode submits real orders to Polymarket.</div>
+          <div class="text-ink-200 text-xs">Type the exact phrase to confirm:</div>
+          <div class="num text-xs bg-surface-900 rounded px-2 py-1" id="confirm-token">—</div>
+          <input id="f-confirm" type="text" placeholder="type confirmation phrase" class="w-full bg-surface-700 border border-accent-red/40 rounded px-3 py-2 text-sm" />
+        </div>
+      </div>
+      <div id="modal-error" class="hidden text-accent-red text-xs"></div>
+      <div class="flex items-center justify-end gap-2">
+        <button id="modal-cancel" class="px-3 py-1.5 rounded bg-surface-700 hover:bg-surface-600 text-sm">Cancel</button>
+        <button id="modal-start" class="px-3 py-1.5 rounded bg-accent-green/15 text-accent-green border border-accent-green/30 hover:bg-accent-green/25 text-sm font-medium">Start</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kill switch button (floating) -->
+  <button id="btn-killswitch"
+          class="fixed bottom-6 right-6 px-4 py-2 rounded-full bg-surface-800 border border-surface-700 text-xs text-ink-400 hover:text-accent-red hover:border-accent-red/40">
+    trip kill switch
+  </button>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
