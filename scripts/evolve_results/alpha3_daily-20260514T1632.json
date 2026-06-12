@@ -1,0 +1,1867 @@
+{
+  "config": {
+    "population_size": 16,
+    "n_generations": 4,
+    "elite_count": 4,
+    "tournament_size": 3,
+    "mutation_rate": null,
+    "placebo_perms": 300,
+    "fee_per_bet": 0.02,
+    "bets_per_year": 200,
+    "seed": 7
+  },
+  "search_space_name": "alpha3_daily",
+  "started_utc": "2026-05-14T16:32:48.416263+00:00",
+  "finished_utc": "2026-05-14T16:33:06.898563+00:00",
+  "generations": [
+    {
+      "generation": 0,
+      "best_genome": {
+        "z_threshold": 0.7922917279842001,
+        "sentiment_lookback_days": 3,
+        "half_life_days": 10,
+        "min_observations": 2,
+        "market_p_lo": 0.2976038372694216,
+        "market_p_hi": 0.7485657980453967,
+        "side": "contrarian",
+        "bet_against_market": false
+      },
+      "best_fitness": {
+        "sharpe_per_bet": 3.6347429514344767,
+        "sharpe_norm": 0.8602504259476942,
+        "dsr": 0.9009688208251256,
+        "pbo": 0.005982905982905983,
+        "placebo_p": 0.006644518272425249,
+        "placebo_pass": 1.0,
+        "tx_robust": 0.9589032015731678,
+        "composite": 0.738759842245397,
+        "n_bets": 124,
+        "n_trials_so_far": 16
+      },
+      "median_composite": 0.0,
+      "n_trials_so_far": 16,
+      "population": [
+        {
+          "genome": {
+            "z_threshold": 1.471498294499487,
+            "sentiment_lookback_days": 5,
+            "half_life_days": 7,
+            "min_observations": 12,
+            "market_p_lo": 0.06931456945072495,
+            "market_p_hi": 0.8785097167965232,
+            "side": "favorable",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.2483640177100654,
+            "sentiment_lookback_days": 17,
+            "half_life_days": 4,
+            "min_observations": 2,
+            "market_p_lo": 0.08437889347566868,
+            "market_p_hi": 0.7172688605483037,
+            "side": "favorable",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 2,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.1531417613741572,
+            "sentiment_lookback_days": 2,
+            "half_life_days": 14,
+            "min_observations": 11,
+            "market_p_lo": 0.09952078445985824,
+            "market_p_hi": 0.6392955858428059,
+            "side": "favorable",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.6487679401693144,
+            "sentiment_lookback_days": 8,
+            "half_life_days": 1,
+            "min_observations": 10,
+            "market_p_lo": 0.39338738361947184,
+            "market_p_hi": 0.6658437145326705,
+            "side": "favorable",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.212741068940203,
+            "sentiment_lookback_days": 18,
+            "half_life_days": 14,
+            "min_observations": 12,
+            "market_p_lo": 0.122290551969575,
+            "market_p_hi": 0.7826400654649865,
+            "side": "favorable",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": -2.771994288329869,
+            "sharpe_norm": 0.20004755895304102,
+            "dsr": 0.005059804084815512,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 0.3388704318936877,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 24,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7922917279842001,
+            "sentiment_lookback_days": 3,
+            "half_life_days": 10,
+            "min_observations": 2,
+            "market_p_lo": 0.2976038372694216,
+            "market_p_hi": 0.7485657980453967,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 3.6347429514344767,
+            "sharpe_norm": 0.8602504259476942,
+            "dsr": 0.9009688208251256,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 0.006644518272425249,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9589032015731678,
+            "composite": 0.738759842245397,
+            "n_bets": 124,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.896805597519022,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 6,
+            "min_observations": 6,
+            "market_p_lo": 0.14937063394301975,
+            "market_p_hi": 0.6219066998332573,
+            "side": "favorable",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": -7.557042012696137,
+            "sharpe_norm": 0.022345726563083684,
+            "dsr": 0.023522650240621036,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 0.1362126245847176,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 7,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.223271130776013,
+            "sentiment_lookback_days": 17,
+            "half_life_days": 8,
+            "min_observations": 7,
+            "market_p_lo": 0.34177811577568706,
+            "market_p_hi": 0.6651751059560747,
+            "side": "favorable",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.5,
+            "dsr": 0.5,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 3,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.0357984919426473,
+            "sentiment_lookback_days": 6,
+            "half_life_days": 13,
+            "min_observations": 7,
+            "market_p_lo": 0.11079381386420191,
+            "market_p_hi": 0.7455852401903222,
+            "side": "favorable",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.7937125986384395,
+            "sentiment_lookback_days": 19,
+            "half_life_days": 13,
+            "min_observations": 7,
+            "market_p_lo": 0.18604894487647822,
+            "market_p_hi": 0.6900713550876674,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 6.726446146188605,
+            "sharpe_norm": 0.9665351836715815,
+            "dsr": 0.2630821650469737,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 0.4219269102990033,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.9740932642487047,
+            "composite": 0.012310437075503737,
+            "n_bets": 5,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7062888482205817,
+            "sentiment_lookback_days": 3,
+            "half_life_days": 5,
+            "min_observations": 9,
+            "market_p_lo": 0.3288168271307713,
+            "market_p_hi": 0.575999990286438,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.3537865962824478,
+            "sentiment_lookback_days": 13,
+            "half_life_days": 11,
+            "min_observations": 7,
+            "market_p_lo": 0.05902517122223543,
+            "market_p_hi": 0.7346781145199064,
+            "side": "favorable",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.7771646024693749,
+            "sharpe_norm": 0.5959413706466655,
+            "dsr": 0.062184885647354735,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 0.8006644518272426,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.8044237485448192,
+            "composite": 0.0014816209708426818,
+            "n_bets": 28,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.9810789836709444,
+            "sentiment_lookback_days": 7,
+            "half_life_days": 13,
+            "min_observations": 6,
+            "market_p_lo": 0.1017360888074737,
+            "market_p_hi": 0.6490459334787657,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 5.734568560195697,
+            "sharpe_norm": 0.9462052829414785,
+            "dsr": 0.7219230489761469,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 0.03322259136212625,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9726086144524143,
+            "composite": 0.6604017891172567,
+            "n_bets": 33,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 7,
+            "min_observations": 10,
+            "market_p_lo": 0.16113565231378027,
+            "market_p_hi": 0.6047704572060104,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 2.987544762912277,
+            "sharpe_norm": 0.8166438113846036,
+            "dsr": 0.6840641181029639,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 0.036544850498338874,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9369352190757011,
+            "composite": 0.5202749342951648,
+            "n_bets": 113,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.619190128489506,
+            "sentiment_lookback_days": 12,
+            "half_life_days": 11,
+            "min_observations": 8,
+            "market_p_lo": 0.4330924815855965,
+            "market_p_hi": 0.6103683623164436,
+            "side": "favorable",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 16
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.1958706004586073,
+            "sentiment_lookback_days": 8,
+            "half_life_days": 1,
+            "min_observations": 9,
+            "market_p_lo": 0.3824374246273145,
+            "market_p_hi": 0.6229371495924789,
+            "side": "contrarian",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.005982905982905983,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 16
+          }
+        }
+      ]
+    },
+    {
+      "generation": 1,
+      "best_genome": {
+        "z_threshold": 0.7922917279842001,
+        "sentiment_lookback_days": 3,
+        "half_life_days": 10,
+        "min_observations": 2,
+        "market_p_lo": 0.2976038372694216,
+        "market_p_hi": 0.7485657980453967,
+        "side": "contrarian",
+        "bet_against_market": false
+      },
+      "best_fitness": {
+        "sharpe_per_bet": 3.6347429514344767,
+        "sharpe_norm": 0.8602504259476942,
+        "dsr": 0.8222727735323245,
+        "pbo": 0.477000777000777,
+        "placebo_p": 0.006644518272425249,
+        "placebo_pass": 1.0,
+        "tx_robust": 0.9589032015731678,
+        "composite": 0.35474527457654803,
+        "n_bets": 124,
+        "n_trials_so_far": 32
+      },
+      "median_composite": 0.00458799273540091,
+      "n_trials_so_far": 32,
+      "population": [
+        {
+          "genome": {
+            "z_threshold": 0.7922917279842001,
+            "sentiment_lookback_days": 3,
+            "half_life_days": 10,
+            "min_observations": 2,
+            "market_p_lo": 0.2976038372694216,
+            "market_p_hi": 0.7485657980453967,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 3.6347429514344767,
+            "sharpe_norm": 0.8602504259476942,
+            "dsr": 0.8222727735323245,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.006644518272425249,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9589032015731678,
+            "composite": 0.35474527457654803,
+            "n_bets": 124,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.9810789836709444,
+            "sentiment_lookback_days": 7,
+            "half_life_days": 13,
+            "min_observations": 6,
+            "market_p_lo": 0.1017360888074737,
+            "market_p_hi": 0.6490459334787657,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 5.734568560195697,
+            "sharpe_norm": 0.9462052829414785,
+            "dsr": 0.6007921519882823,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.019933554817275746,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9726086144524143,
+            "composite": 0.28916703033431446,
+            "n_bets": 33,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 7,
+            "min_observations": 10,
+            "market_p_lo": 0.16113565231378027,
+            "market_p_hi": 0.6047704572060104,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 2.987544762912277,
+            "sharpe_norm": 0.8166438113846036,
+            "dsr": 0.5623260108219663,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.036544850498338874,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9369352190757011,
+            "composite": 0.2250253551330025,
+            "n_bets": 113,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.7937125986384395,
+            "sentiment_lookback_days": 19,
+            "half_life_days": 13,
+            "min_observations": 7,
+            "market_p_lo": 0.18604894487647822,
+            "market_p_hi": 0.6900713550876674,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 6.726446146188605,
+            "sharpe_norm": 0.9665351836715815,
+            "dsr": 0.18635174573050772,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.38205980066445183,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.9740932642487047,
+            "composite": 0.00458799273540091,
+            "n_bets": 5,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.212741068940203,
+            "sentiment_lookback_days": 18,
+            "half_life_days": 13,
+            "min_observations": 7,
+            "market_p_lo": 0.18604894487647822,
+            "market_p_hi": 0.6900713550876674,
+            "side": "favorable",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": -2.6840179135843756,
+            "sharpe_norm": 0.20717988047370126,
+            "dsr": 0.0027241286013085066,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.3687707641196013,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 22,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.896805597519022,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 6,
+            "min_observations": 6,
+            "market_p_lo": 0.22286268504899842,
+            "market_p_hi": 0.6219066998332573,
+            "side": "contrarian",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": 3.2980143442930148,
+            "sharpe_norm": 0.838756821751939,
+            "dsr": 0.1031457039887741,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.39867109634551495,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.9546987466653243,
+            "composite": 0.0021598550696173917,
+            "n_bets": 15,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.3537865962824478,
+            "sentiment_lookback_days": 13,
+            "half_life_days": 7,
+            "min_observations": 10,
+            "market_p_lo": 0.05902517122223543,
+            "market_p_hi": 0.6047704572060104,
+            "side": "favorable",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 1.4733814898295057,
+            "sharpe_norm": 0.6762717898229025,
+            "dsr": 0.08405199163962995,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.46511627906976744,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.8637884807327242,
+            "composite": 0.0012839488903134434,
+            "n_bets": 58,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.9810789836709444,
+            "sentiment_lookback_days": 7,
+            "half_life_days": 5,
+            "min_observations": 6,
+            "market_p_lo": 0.3288168271307713,
+            "market_p_hi": 0.575999990286438,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 10.40699000621282,
+            "sharpe_norm": 0.994532737613789,
+            "dsr": 0.5822092576224962,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.0664451827242525,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.9840004266552893,
+            "composite": 0.01489925403979041,
+            "n_bets": 10,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.223271130776013,
+            "sentiment_lookback_days": 3,
+            "half_life_days": 10,
+            "min_observations": 2,
+            "market_p_lo": 0.34177811577568706,
+            "market_p_hi": 0.7485657980453967,
+            "side": "contrarian",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": 4.398502015341523,
+            "sharpe_norm": 0.9001822309564138,
+            "dsr": 0.11386050137856346,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.3388704318936877,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.9741907732014197,
+            "composite": 0.00261107043791221,
+            "n_bets": 12,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.9810789836709444,
+            "sentiment_lookback_days": 7,
+            "half_life_days": 13,
+            "min_observations": 7,
+            "market_p_lo": 0.05,
+            "market_p_hi": 0.6490459334787657,
+            "side": "favorable",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": -5.099537328879893,
+            "sharpe_norm": 0.07244202822755508,
+            "dsr": 0.00676956329035366,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.3289036544850498,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 11,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.080745079581515,
+            "sentiment_lookback_days": 8,
+            "half_life_days": 2,
+            "min_observations": 4,
+            "market_p_lo": 0.15475811675304088,
+            "market_p_hi": 0.6224583870225199,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 10.198274789323232,
+            "sharpe_norm": 0.9939350007528841,
+            "dsr": 0.6075553190104392,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.0664451827242525,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.9821515495700146,
+            "composite": 0.015509341749648119,
+            "n_bets": 11,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 7,
+            "min_observations": 12,
+            "market_p_lo": 0.122290551969575,
+            "market_p_hi": 0.6090046761656269,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 2.304334786563041,
+            "sharpe_norm": 0.7599065774845908,
+            "dsr": 0.3717771909331044,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.0664451827242525,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.9172258104972725,
+            "composite": 0.006776263108805287,
+            "n_bets": 121,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7922917279842001,
+            "sentiment_lookback_days": 13,
+            "half_life_days": 10,
+            "min_observations": 7,
+            "market_p_lo": 0.06998144013466664,
+            "market_p_hi": 0.7346781145199064,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 2.2421961447003675,
+            "sharpe_norm": 0.7541923407839314,
+            "dsr": 0.4222383503671794,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.04983388704318937,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9225425708489581,
+            "composite": 0.15364812090781618,
+            "n_bets": 147,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.896805597519022,
+            "sentiment_lookback_days": 7,
+            "half_life_days": 13,
+            "min_observations": 6,
+            "market_p_lo": 0.1017360888074737,
+            "market_p_hi": 0.6490459334787657,
+            "side": "favorable",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": -0.29490862544024105,
+            "sharpe_norm": 0.4632030699506704,
+            "dsr": 0.014274876999470738,
+            "pbo": 0.477000777000777,
+            "placebo_p": 0.8870431893687708,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 38,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.093257518697491,
+            "sentiment_lookback_days": 7,
+            "half_life_days": 5,
+            "min_observations": 9,
+            "market_p_lo": 0.25003543994473576,
+            "market_p_hi": 0.6211599536851715,
+            "side": "contrarian",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.477000777000777,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 32
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.1630905154269935,
+            "sentiment_lookback_days": 6,
+            "half_life_days": 11,
+            "min_observations": 7,
+            "market_p_lo": 0.11079381386420191,
+            "market_p_hi": 0.7485657980453967,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.477000777000777,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 32
+          }
+        }
+      ]
+    },
+    {
+      "generation": 2,
+      "best_genome": {
+        "z_threshold": 0.7922917279842001,
+        "sentiment_lookback_days": 8,
+        "half_life_days": 2,
+        "min_observations": 4,
+        "market_p_lo": 0.29988750376372475,
+        "market_p_hi": 0.7652084275859683,
+        "side": "contrarian",
+        "bet_against_market": false
+      },
+      "best_fitness": {
+        "sharpe_per_bet": 4.772620465590494,
+        "sharpe_norm": 0.9157774157758601,
+        "dsr": 0.9143942778437502,
+        "pbo": 0.5975912975912976,
+        "placebo_p": 0.0033222591362126247,
+        "placebo_pass": 1.0,
+        "tx_robust": 0.9662962187882058,
+        "composite": 0.32561250313640216,
+        "n_bets": 102,
+        "n_trials_so_far": 48
+      },
+      "median_composite": 0.11511371460568057,
+      "n_trials_so_far": 48,
+      "population": [
+        {
+          "genome": {
+            "z_threshold": 0.7922917279842001,
+            "sentiment_lookback_days": 3,
+            "half_life_days": 10,
+            "min_observations": 2,
+            "market_p_lo": 0.2976038372694216,
+            "market_p_hi": 0.7485657980453967,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 3.6347429514344767,
+            "sharpe_norm": 0.8602504259476942,
+            "dsr": 0.7670475337261484,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 0.006644518272425249,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9589032015731678,
+            "composite": 0.25461811989887584,
+            "n_bets": 124,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.9810789836709444,
+            "sentiment_lookback_days": 7,
+            "half_life_days": 13,
+            "min_observations": 6,
+            "market_p_lo": 0.1017360888074737,
+            "market_p_hi": 0.6490459334787657,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 5.734568560195697,
+            "sharpe_norm": 0.9462052829414785,
+            "dsr": 0.5305007265622187,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 0.023255813953488372,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9726086144524143,
+            "composite": 0.19646121586132786,
+            "n_bets": 33,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 7,
+            "min_observations": 10,
+            "market_p_lo": 0.16113565231378027,
+            "market_p_hi": 0.6047704572060104,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 2.987544762912277,
+            "sharpe_norm": 0.8166438113846036,
+            "dsr": 0.4935668149816357,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 0.023255813953488372,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9369352190757011,
+            "composite": 0.15196919249574145,
+            "n_bets": 113,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7922917279842001,
+            "sentiment_lookback_days": 13,
+            "half_life_days": 10,
+            "min_observations": 7,
+            "market_p_lo": 0.06998144013466664,
+            "market_p_hi": 0.7346781145199064,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 2.2421961447003675,
+            "sharpe_norm": 0.7541923407839314,
+            "dsr": 0.35429800562723035,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 0.07641196013289037,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.9225425708489581,
+            "composite": 0.004959919290791723,
+            "n_bets": 147,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.8709356828673482,
+            "sentiment_lookback_days": 7,
+            "half_life_days": 2,
+            "min_observations": 6,
+            "market_p_lo": 0.4087160535110642,
+            "market_p_hi": 0.7038243037454996,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.896805597519022,
+            "sentiment_lookback_days": 7,
+            "half_life_days": 13,
+            "min_observations": 5,
+            "market_p_lo": 0.22286268504899842,
+            "market_p_hi": 0.6490459334787657,
+            "side": "favorable",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": -0.0626425093769824,
+            "sharpe_norm": 0.4921703264069268,
+            "dsr": 0.01220741342749962,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 0.973421926910299,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 34,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7922917279842001,
+            "sentiment_lookback_days": 3,
+            "half_life_days": 10,
+            "min_observations": 2,
+            "market_p_lo": 0.18604894487647822,
+            "market_p_hi": 0.7485657980453967,
+            "side": "favorable",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 1.730558068568688,
+            "sharpe_norm": 0.7037624146198243,
+            "dsr": 0.19895372718919074,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 0.12956810631229235,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.8869824835663304,
+            "composite": 0.002498794609606645,
+            "n_bets": 147,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 10,
+            "min_observations": 10,
+            "market_p_lo": 0.16113565231378027,
+            "market_p_hi": 0.6047704572060104,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 3.830650432082467,
+            "sharpe_norm": 0.8716162270474169,
+            "dsr": 0.7668593155794354,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 0.009966777408637873,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9518950736992142,
+            "composite": 0.25603388607353655,
+            "n_bets": 117,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.0129523078072415,
+            "sentiment_lookback_days": 3,
+            "half_life_days": 13,
+            "min_observations": 6,
+            "market_p_lo": 0.05,
+            "market_p_hi": 0.6490459334787657,
+            "side": "contrarian",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 13,
+            "half_life_days": 7,
+            "min_observations": 7,
+            "market_p_lo": 0.122290551969575,
+            "market_p_hi": 0.7346781145199064,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 2.342735655389158,
+            "sharpe_norm": 0.7633921680145984,
+            "dsr": 0.40453047356092076,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 0.046511627906976744,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9263194037688596,
+            "composite": 0.11511371460568057,
+            "n_bets": 152,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 8,
+            "half_life_days": 5,
+            "min_observations": 4,
+            "market_p_lo": 0.15475811675304088,
+            "market_p_hi": 0.6224583870225199,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 2.5780270905785483,
+            "sharpe_norm": 0.7839801746830023,
+            "dsr": 0.4258765910024572,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 0.04318936877076412,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9275041505257334,
+            "composite": 0.12461550312354254,
+            "n_bets": 131,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 14,
+            "min_observations": 9,
+            "market_p_lo": 0.16113565231378027,
+            "market_p_hi": 0.6047704572060104,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 3.8006351494966992,
+            "sharpe_norm": 0.8699274646073669,
+            "dsr": 0.7751907867088329,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 0.009966777408637873,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.951274186728592,
+            "composite": 0.2581455963261144,
+            "n_bets": 121,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7922917279842001,
+            "sentiment_lookback_days": 8,
+            "half_life_days": 2,
+            "min_observations": 4,
+            "market_p_lo": 0.29988750376372475,
+            "market_p_hi": 0.7652084275859683,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 4.772620465590494,
+            "sharpe_norm": 0.9157774157758601,
+            "dsr": 0.9143942778437502,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 0.0033222591362126247,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9662962187882058,
+            "composite": 0.32561250313640216,
+            "n_bets": 102,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 2.223271130776013,
+            "sentiment_lookback_days": 12,
+            "half_life_days": 10,
+            "min_observations": 7,
+            "market_p_lo": 0.06998144013466664,
+            "market_p_hi": 0.7346781145199064,
+            "side": "contrarian",
+            "bet_against_market": true
+          },
+          "fitness": {
+            "sharpe_per_bet": 3.2980143442930148,
+            "sharpe_norm": 0.838756821751939,
+            "dsr": 0.07584332241596577,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 0.34551495016611294,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.9546987466653243,
+            "composite": 0.0012219604108573963,
+            "n_bets": 15,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 1.9810789836709444,
+            "sentiment_lookback_days": 4,
+            "half_life_days": 2,
+            "min_observations": 6,
+            "market_p_lo": 0.3288168271307713,
+            "market_p_hi": 0.575999990286438,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 48
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 3.361830725789428,
+            "sentiment_lookback_days": 1,
+            "half_life_days": 3,
+            "min_observations": 2,
+            "market_p_lo": 0.22007995161268645,
+            "market_p_hi": 0.8554763075581089,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.5975912975912976,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 48
+          }
+        }
+      ]
+    },
+    {
+      "generation": 3,
+      "best_genome": {
+        "z_threshold": 0.7922917279842001,
+        "sentiment_lookback_days": 8,
+        "half_life_days": 2,
+        "min_observations": 4,
+        "market_p_lo": 0.29988750376372475,
+        "market_p_hi": 0.7652084275859683,
+        "side": "contrarian",
+        "bet_against_market": false
+      },
+      "best_fitness": {
+        "sharpe_per_bet": 4.772620465590494,
+        "sharpe_norm": 0.9157774157758601,
+        "dsr": 0.8922611905801626,
+        "pbo": 0.6882672882672882,
+        "placebo_p": 0.0033222591362126247,
+        "placebo_pass": 1.0,
+        "tx_robust": 0.9662962187882058,
+        "composite": 0.24613568919988546,
+        "n_bets": 102,
+        "n_trials_so_far": 64
+      },
+      "median_composite": 0.07581435192956044,
+      "n_trials_so_far": 64,
+      "population": [
+        {
+          "genome": {
+            "z_threshold": 0.7922917279842001,
+            "sentiment_lookback_days": 8,
+            "half_life_days": 2,
+            "min_observations": 4,
+            "market_p_lo": 0.29988750376372475,
+            "market_p_hi": 0.7652084275859683,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 4.772620465590494,
+            "sharpe_norm": 0.9157774157758601,
+            "dsr": 0.8922611905801626,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.0033222591362126247,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9662962187882058,
+            "composite": 0.24613568919988546,
+            "n_bets": 102,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 14,
+            "min_observations": 9,
+            "market_p_lo": 0.16113565231378027,
+            "market_p_hi": 0.6047704572060104,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 3.8006351494966992,
+            "sharpe_norm": 0.8699274646073669,
+            "dsr": 0.7382060917587474,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.013289036544850499,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.951274186728592,
+            "composite": 0.19043587096502823,
+            "n_bets": 121,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 10,
+            "min_observations": 10,
+            "market_p_lo": 0.16113565231378027,
+            "market_p_hi": 0.6047704572060104,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 3.830650432082467,
+            "sharpe_norm": 0.8716162270474169,
+            "dsr": 0.7291148502062379,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.0033222591362126247,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9518950736992142,
+            "composite": 0.18857873037157327,
+            "n_bets": 117,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7922917279842001,
+            "sentiment_lookback_days": 3,
+            "half_life_days": 10,
+            "min_observations": 2,
+            "market_p_lo": 0.2976038372694216,
+            "market_p_hi": 0.7485657980453967,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 3.6347429514344767,
+            "sharpe_norm": 0.8602504259476942,
+            "dsr": 0.7248386127970452,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.0033222591362126247,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9589032015731678,
+            "composite": 0.18639032387031784,
+            "n_bets": 124,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 3,
+            "half_life_days": 10,
+            "min_observations": 11,
+            "market_p_lo": 0.3344697602758168,
+            "market_p_hi": 0.6047704572060104,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7922917279842001,
+            "sentiment_lookback_days": 7,
+            "half_life_days": 2,
+            "min_observations": 4,
+            "market_p_lo": 0.1017360888074737,
+            "market_p_hi": 0.7652084275859683,
+            "side": "favorable",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 1.8866322912834992,
+            "sharpe_norm": 0.7197690164360191,
+            "dsr": 0.1812198973305626,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.15282392026578073,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.8965368587440722,
+            "composite": 0.0018227183205136437,
+            "n_bets": 132,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 3,
+            "half_life_days": 9,
+            "min_observations": 4,
+            "market_p_lo": 0.2976038372694216,
+            "market_p_hi": 0.7485657980453967,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7922917279842001,
+            "sentiment_lookback_days": 13,
+            "half_life_days": 10,
+            "min_observations": 8,
+            "market_p_lo": 0.1017360888074737,
+            "market_p_hi": 0.6490459334787657,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 2.5498382180395023,
+            "sharpe_norm": 0.7815836552654803,
+            "dsr": 0.3579759015338876,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.059800664451827246,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.9280211969073675,
+            "composite": 0.004047059020672823,
+            "n_bets": 127,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 13,
+            "half_life_days": 5,
+            "min_observations": 7,
+            "market_p_lo": 0.06998144013466664,
+            "market_p_hi": 0.7346781145199064,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 1.9819872752901126,
+            "sharpe_norm": 0.7292841397077344,
+            "dsr": 0.237432953971219,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.12624584717607973,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.9116403960473803,
+            "composite": 0.002460445260416548,
+            "n_bets": 150,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7922917279842001,
+            "sentiment_lookback_days": 3,
+            "half_life_days": 10,
+            "min_observations": 7,
+            "market_p_lo": 0.3024909321124728,
+            "market_p_hi": 0.7346781145199064,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 0.0,
+            "sharpe_norm": 0.0,
+            "dsr": 0.0,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 1.0,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.0,
+            "composite": 0.0,
+            "n_bets": 0,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 8,
+            "half_life_days": 5,
+            "min_observations": 4,
+            "market_p_lo": 0.15475811675304088,
+            "market_p_hi": 0.6047704572060104,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 2.580881133789901,
+            "sharpe_norm": 0.784221750360075,
+            "dsr": 0.36610334469543276,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.029900332225913623,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9263139940057021,
+            "composite": 0.08290546936362851,
+            "n_bets": 126,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 2,
+            "min_observations": 3,
+            "market_p_lo": 0.29988750376372475,
+            "market_p_hi": 0.6047704572060104,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 5.291374709872004,
+            "sharpe_norm": 0.9337446849177421,
+            "dsr": 0.8385168768147155,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.009966777408637873,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9655024361104368,
+            "composite": 0.23565448089719315,
+            "n_bets": 77,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 7,
+            "half_life_days": 13,
+            "min_observations": 6,
+            "market_p_lo": 0.16113565231378027,
+            "market_p_hi": 0.6490459334787657,
+            "side": "contrarian",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 3.1765992508660674,
+            "sharpe_norm": 0.8303767377733606,
+            "dsr": 0.6518059865697171,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.009966777408637873,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9445788431933143,
+            "composite": 0.15937276621003957,
+            "n_bets": 147,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.6626468498589247,
+            "sentiment_lookback_days": 14,
+            "half_life_days": 10,
+            "min_observations": 7,
+            "market_p_lo": 0.122290551969575,
+            "market_p_hi": 0.7346781145199064,
+            "side": "favorable",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 2.24199755397531,
+            "sharpe_norm": 0.7541739323240273,
+            "dsr": 0.3534471000491549,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.04318936877076412,
+            "placebo_pass": 1.0,
+            "tx_robust": 0.9123744389826886,
+            "composite": 0.07581435192956044,
+            "n_bets": 164,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 10,
+            "min_observations": 9,
+            "market_p_lo": 0.16113565231378027,
+            "market_p_hi": 0.6047704572060104,
+            "side": "favorable",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 1.9318070701638856,
+            "sharpe_norm": 0.724302232904611,
+            "dsr": 0.17094897598970954,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.10299003322259136,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.8956963605161693,
+            "composite": 0.0017286199426596502,
+            "n_bets": 117,
+            "n_trials_so_far": 64
+          }
+        },
+        {
+          "genome": {
+            "z_threshold": 0.7417439036004159,
+            "sentiment_lookback_days": 15,
+            "half_life_days": 14,
+            "min_observations": 9,
+            "market_p_lo": 0.1017360888074737,
+            "market_p_hi": 0.6490459334787657,
+            "side": "favorable",
+            "bet_against_market": false
+          },
+          "fitness": {
+            "sharpe_per_bet": 2.1464044405246456,
+            "sharpe_norm": 0.7452054124491361,
+            "dsr": 0.2532987902024856,
+            "pbo": 0.6882672882672882,
+            "placebo_p": 0.10299003322259136,
+            "placebo_pass": 0.05,
+            "tx_robust": 0.9079294353005365,
+            "composite": 0.002671244211705982,
+            "n_bets": 135,
+            "n_trials_so_far": 64
+          }
+        }
+      ]
+    }
+  ],
+  "elite_train": [
+    {
+      "genome": {
+        "z_threshold": 0.7922917279842001,
+        "sentiment_lookback_days": 8,
+        "half_life_days": 2,
+        "min_observations": 4,
+        "market_p_lo": 0.29988750376372475,
+        "market_p_hi": 0.7652084275859683,
+        "side": "contrarian",
+        "bet_against_market": false
+      },
+      "fitness": {
+        "sharpe_per_bet": 4.772620465590494,
+        "sharpe_norm": 0.9157774157758601,
+        "dsr": 0.8922611905801626,
+        "pbo": 0.6882672882672882,
+        "placebo_p": 0.0033222591362126247,
+        "placebo_pass": 1.0,
+        "tx_robust": 0.9662962187882058,
+        "composite": 0.24613568919988546,
+        "n_bets": 102,
+        "n_trials_so_far": 64
+      }
+    },
+    {
+      "genome": {
+        "z_threshold": 0.7417439036004159,
+        "sentiment_lookback_days": 15,
+        "half_life_days": 2,
+        "min_observations": 3,
+        "market_p_lo": 0.29988750376372475,
+        "market_p_hi": 0.6047704572060104,
+        "side": "contrarian",
+        "bet_against_market": false
+      },
+      "fitness": {
+        "sharpe_per_bet": 5.291374709872004,
+        "sharpe_norm": 0.9337446849177421,
+        "dsr": 0.8385168768147155,
+        "pbo": 0.6882672882672882,
+        "placebo_p": 0.009966777408637873,
+        "placebo_pass": 1.0,
+        "tx_robust": 0.9655024361104368,
+        "composite": 0.23565448089719315,
+        "n_bets": 77,
+        "n_trials_so_far": 64
+      }
+    },
+    {
+      "genome": {
+        "z_threshold": 0.7417439036004159,
+        "sentiment_lookback_days": 15,
+        "half_life_days": 14,
+        "min_observations": 9,
+        "market_p_lo": 0.16113565231378027,
+        "market_p_hi": 0.6047704572060104,
+        "side": "contrarian",
+        "bet_against_market": false
+      },
+      "fitness": {
+        "sharpe_per_bet": 3.8006351494966992,
+        "sharpe_norm": 0.8699274646073669,
+        "dsr": 0.7382060917587474,
+        "pbo": 0.6882672882672882,
+        "placebo_p": 0.013289036544850499,
+        "placebo_pass": 1.0,
+        "tx_robust": 0.951274186728592,
+        "composite": 0.19043587096502823,
+        "n_bets": 121,
+        "n_trials_so_far": 64
+      }
+    },
+    {
+      "genome": {
+        "z_threshold": 0.7417439036004159,
+        "sentiment_lookback_days": 15,
+        "half_life_days": 10,
+        "min_observations": 10,
+        "market_p_lo": 0.16113565231378027,
+        "market_p_hi": 0.6047704572060104,
+        "side": "contrarian",
+        "bet_against_market": false
+      },
+      "fitness": {
+        "sharpe_per_bet": 3.830650432082467,
+        "sharpe_norm": 0.8716162270474169,
+        "dsr": 0.7291148502062379,
+        "pbo": 0.6882672882672882,
+        "placebo_p": 0.0033222591362126247,
+        "placebo_pass": 1.0,
+        "tx_robust": 0.9518950736992142,
+        "composite": 0.18857873037157327,
+        "n_bets": 117,
+        "n_trials_so_far": 64
+      }
+    }
+  ],
+  "elite_holdout": [
+    {
+      "genome": {
+        "z_threshold": 0.7922917279842001,
+        "sentiment_lookback_days": 8,
+        "half_life_days": 2,
+        "min_observations": 4,
+        "market_p_lo": 0.29988750376372475,
+        "market_p_hi": 0.7652084275859683,
+        "side": "contrarian",
+        "bet_against_market": false
+      },
+      "fitness": {
+        "sharpe_per_bet": 8.113952118861299,
+        "sharpe_norm": 0.9829929846928276,
+        "dsr": 0.9806818071388831,
+        "pbo": 0.4551670551670552,
+        "placebo_p": 0.0033222591362126247,
+        "placebo_pass": 1.0,
+        "tx_robust": 0.9848418277680141,
+        "composite": 0.5172593897333218,
+        "n_bets": 46,
+        "n_trials_so_far": 64
+      }
+    },
+    {
+      "genome": {
+        "z_threshold": 0.7417439036004159,
+        "sentiment_lookback_days": 15,
+        "half_life_days": 2,
+        "min_observations": 3,
+        "market_p_lo": 0.29988750376372475,
+        "market_p_hi": 0.6047704572060104,
+        "side": "contrarian",
+        "bet_against_market": false
+      },
+      "fitness": {
+        "sharpe_per_bet": 5.573227799649774,
+        "sharpe_norm": 0.9419481634484885,
+        "dsr": 0.4830808063627247,
+        "pbo": 0.4551670551670552,
+        "placebo_p": 0.023255813953488372,
+        "placebo_pass": 1.0,
+        "tx_robust": 0.969688221709007,
+        "composite": 0.24040431984194904,
+        "n_bets": 35,
+        "n_trials_so_far": 64
+      }
+    },
+    {
+      "genome": {
+        "z_threshold": 0.7417439036004159,
+        "sentiment_lookback_days": 15,
+        "half_life_days": 14,
+        "min_observations": 9,
+        "market_p_lo": 0.16113565231378027,
+        "market_p_hi": 0.6047704572060104,
+        "side": "contrarian",
+        "bet_against_market": false
+      },
+      "fitness": {
+        "sharpe_per_bet": 5.450842378279828,
+        "sharpe_norm": 0.9385101291430185,
+        "dsr": 0.7093418813809848,
+        "pbo": 0.4551670551670552,
+        "placebo_p": 0.0033222591362126247,
+        "placebo_pass": 1.0,
+        "tx_robust": 0.966822500377017,
+        "composite": 0.35067489546255276,
+        "n_bets": 55,
+        "n_trials_so_far": 64
+      }
+    },
+    {
+      "genome": {
+        "z_threshold": 0.7417439036004159,
+        "sentiment_lookback_days": 15,
+        "half_life_days": 10,
+        "min_observations": 10,
+        "market_p_lo": 0.16113565231378027,
+        "market_p_hi": 0.6047704572060104,
+        "side": "contrarian",
+        "bet_against_market": false
+      },
+      "fitness": {
+        "sharpe_per_bet": 5.117721658578667,
+        "sharpe_norm": 0.9281665423744188,
+        "dsr": 0.6174665105686938,
+        "pbo": 0.4551670551670552,
+        "placebo_p": 0.0033222591362126247,
+        "placebo_pass": 1.0,
+        "tx_robust": 0.9649325944917708,
+        "composite": 0.3013003626348898,
+        "n_bets": 53,
+        "n_trials_so_far": 64
+      }
+    }
+  ],
+  "n_trials_total": 64
+}

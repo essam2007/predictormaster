@@ -27,3 +27,4 @@ mlruns/
 *.tfstate
 *.tfstate.backup
 .tfplan
+logs/

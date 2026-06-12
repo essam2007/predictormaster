@@ -13,7 +13,6 @@ from pathlib import Path
 import numpy as np
 
 from .calibration import (
-    CalibrationReport,
     brier_skill_score,
     expected_calibration_error,
     log_loss,

@@ -54,7 +54,11 @@ class TransformerSeqTrainer:
         try:
             import torch
             from torch.optim import AdamW
-            from transformers import AutoConfig, AutoModelForSequenceClassification, get_cosine_schedule_with_warmup
+            from transformers import (
+                AutoConfig,
+                AutoModelForSequenceClassification,
+                get_cosine_schedule_with_warmup,
+            )
         except Exception as exc:
             raise RuntimeError("PyTorch + transformers are required to train") from exc
 
@@ -66,15 +70,13 @@ class TransformerSeqTrainer:
         sched = get_cosine_schedule_with_warmup(opt, self.config.warmup_steps, self.config.max_steps)
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model.to(device)
-        step = 0
-        for batch in train_loader:
+        for step, batch in enumerate(train_loader, start=1):
             opt.zero_grad()
             out = model(**{k: v.to(device) for k, v in batch.items()})
             out.loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()
             sched.step()
-            step += 1
             if step >= self.config.max_steps:
                 break
         self.state = {"model": model.state_dict(), "config": cfg.to_dict()}

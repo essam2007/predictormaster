@@ -12,6 +12,13 @@
 | /forecast API (cold)   | continuous     | 50 ms p99      | critical | Platform |
 | Weekly retrain         | 168 h          | 4 h            | warning  | Research |
 | Calibration audit      | 24 h           | 5 min          | critical | Research |
+| Polymarket Gamma+CLOB  | 1 s            | 500 ms         | critical | Platform |
+| Kalshi public markets  | 5 s            | 500 ms         | critical | Platform |
+| Sportsbook consensus   | 30 s           | 5 s            | high     | Platform |
+| Reddit poller          | 5 s            | 2 s            | medium   | DE       |
+| X v2 filtered search   | streaming      | 1 s            | high     | DE       |
+| RSS feeds              | 60 s           | 5 s            | low      | DE       |
+| /live API              | continuous     | 50 ms p99      | high     | Platform |
 
 ## Signal half-lives (drives retrain frequency)
 

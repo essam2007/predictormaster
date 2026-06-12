@@ -6,7 +6,6 @@ is provided for local experiments and tests on a discretised state-space.
 """
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass, field
 
 import numpy as np

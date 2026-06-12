@@ -7,7 +7,7 @@ maps remote shapes to internal pydantic schemas.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any
 
 from .base import SLA, Envelope, Source

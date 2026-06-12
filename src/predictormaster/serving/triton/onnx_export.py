@@ -54,7 +54,7 @@ def verify_logit_equality(
     *,
     py_predict_proba,
     onnx_path: Path,
-    X: "np.ndarray",  # type: ignore[name-defined]
+    X: np.ndarray,  # type: ignore[name-defined]  # noqa: F821
     rtol: float = 1e-4,
     atol: float = 1e-5,
 ) -> bool:

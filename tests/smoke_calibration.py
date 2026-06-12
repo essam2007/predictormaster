@@ -6,8 +6,8 @@ that the report passes the same gate the production pipeline applies.
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
 import numpy as np
 
