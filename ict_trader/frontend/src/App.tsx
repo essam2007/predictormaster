@@ -1,5 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type Status, type Summary, type EquityPoint } from "./api";
+
+// Re-run `fn` on mount and every `ms` so live paper activity shows without a manual reload.
+function usePoll(fn: () => void, ms = 15000) {
+  const saved = useRef(fn);
+  saved.current = fn;
+  useEffect(() => {
+    saved.current();
+    const id = setInterval(() => saved.current(), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+}
 
 // Minimal research-deck shell. Tabs map to the plan's pages; this scaffold wires the data
 // flow (status, per-bucket analytics, equity, trade journal). Candlestick overlays use
@@ -40,7 +51,7 @@ export function App() {
 function StatusView() {
   const [s, setS] = useState<Status | null>(null);
   const [err, setErr] = useState("");
-  useEffect(() => { api.status().then(setS).catch((e) => setErr(String(e))); }, []);
+  usePoll(() => { api.status().then(setS).catch((e) => setErr(String(e))); });
   if (err) return <div style={card}>API not reachable: {err}</div>;
   if (!s) return <div style={card}>loading…</div>;
   return (
@@ -57,7 +68,7 @@ function StatusView() {
 
 function BucketsView() {
   const [sum, setSum] = useState<Summary | null>(null);
-  useEffect(() => { api.summary().then(setSum).catch(() => {}); }, []);
+  usePoll(() => { api.summary().then(setSum).catch(() => {}); });
   if (!sum) return <div style={card}>run a backtest first (POST /api/backtest)…</div>;
   return (
     <div>
@@ -92,7 +103,7 @@ function BucketsView() {
 
 function EquityView() {
   const [eq, setEq] = useState<EquityPoint[]>([]);
-  useEffect(() => { api.equity().then(setEq).catch(() => {}); }, []);
+  usePoll(() => { api.equity().then(setEq).catch(() => {}); });
   const last = eq[eq.length - 1];
   return (
     <div style={card}>
@@ -106,7 +117,7 @@ function EquityView() {
 
 function JournalView() {
   const [rows, setRows] = useState<any[]>([]);
-  useEffect(() => { api.trades().then(setRows).catch(() => {}); }, []);
+  usePoll(() => { api.trades().then(setRows).catch(() => {}); });
   return (
     <div style={card}>
       <h2>Trade Journal ({rows.length})</h2>

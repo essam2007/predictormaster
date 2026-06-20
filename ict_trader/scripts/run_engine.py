@@ -1,13 +1,17 @@
 #!/usr/bin/env python
 """Start the live/demo engine.
 
-Phase 2 (paper): runs the pipeline against a feed in DRY-RUN — computes setups and pushes
-them to the research deck, but places no orders. Wiring a TradovateREST executor and
-clearing ``dry_run`` (Phase 3) arms execution on the demo endpoint first.
+By default it runs in PAPER (dry-run): it computes setups, simulates fills, manages each
+position (partials, runner-to-ERL, corrected breakeven) and persists everything to the
+research deck — but places NO orders. Data comes from your connected Tradovate account
+(demo unless ICT_TRADER_MODE=live) or from CSV replay.
 
 Usage:
-    python scripts/run_engine.py --replay-es es.csv --replay-nq nq.csv   # paper over CSV
-    python scripts/run_engine.py                                         # live feed (TODO)
+    python scripts/run_engine.py                       # PAPER on live Tradovate data
+    python scripts/run_engine.py --replay-es es.csv --replay-nq nq.csv   # PAPER on CSV
+    python scripts/run_engine.py --arm                 # place orders (demo endpoint first)
+
+Requires TRADOVATE_* in .env for the live feed (the API Access add-on must be enabled).
 """
 
 from __future__ import annotations
@@ -21,6 +25,8 @@ from ict_trader.engine.pipeline import SignalPipeline
 from ict_trader.engine.runtime import LiveEngine
 from ict_trader.execution.risk import RiskEngine
 from ict_trader.marketdata.replay import CsvReplayFeed
+
+log = logging.getLogger("ict_trader.run_engine")
 
 
 async def _run(args: argparse.Namespace) -> None:
@@ -39,11 +45,54 @@ async def _run(args: argparse.Namespace) -> None:
         dry_run=not args.arm,
     )
     await _wire_persistence(engine, settings)
+
     if args.replay_es and args.replay_nq:
+        log.info("PAPER over CSV replay")
         feed = CsvReplayFeed(args.replay_es, args.replay_nq)
         await engine.run(feed.stream())
+        return
+
+    # --- live Tradovate feed (your account) ---
+    feed, rest = _build_live_feed(settings)
+    result = await rest.verify()
+    if not result.get("connected"):
+        await rest.close()
+        raise SystemExit(f"Tradovate connection failed: {result.get('error')}. "
+                         "Check TRADOVATE_* in .env (API Access add-on required).")
+    log.info("connected to Tradovate account %s (%s)", result.get("account_id"),
+             settings.tradovate_base_url)
+    if args.arm:
+        engine.executor = rest
+        engine.dry_run = False
+        log.warning("EXECUTION ARMED on %s — orders WILL be placed (%s)",
+                    settings.mode.value, settings.tradovate_base_url)
     else:
-        raise SystemExit("Live market-data feed wiring is a Phase-3 task; use --replay-* for paper.")
+        log.info("PAPER mode — streaming your account's data, placing NO orders")
+    try:
+        await engine.run(feed.stream())
+    finally:
+        await rest.close()
+
+
+def _build_live_feed(settings):
+    """Build the Tradovate market-data feed + a shared REST client from env creds."""
+    import httpx
+
+    from ict_trader.config import get_tradovate_settings
+    from ict_trader.execution.tradovate_rest import TradovateCredentials, TradovateREST
+    from ict_trader.marketdata.tradovate_md import TradovateMarketData
+
+    ts = get_tradovate_settings()
+    if not ts.configured:
+        raise SystemExit("Tradovate credentials not set — fill TRADOVATE_* in .env "
+                         "(or use --replay-es/--replay-nq for CSV).")
+    creds = TradovateCredentials(
+        name=ts.name, password=ts.password, app_id=ts.app_id, app_version=ts.app_version,
+        cid=ts.cid, sec=ts.secret, device_id=ts.device_id)
+    rest = TradovateREST(settings.tradovate_base_url, creds,
+                         client=httpx.AsyncClient(timeout=15.0))
+    feed = TradovateMarketData(rest, settings.tradovate_md_ws, ts.es_symbol, ts.nq_symbol)
+    return feed, rest
 
 
 async def _wire_persistence(engine, settings) -> None:
