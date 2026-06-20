@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type Status, type Summary, type EquityPoint } from "./api";
 
-// Re-run `fn` on mount and every `ms` so live paper activity shows without a manual reload.
-function usePoll(fn: () => void, ms = 15000) {
+// Re-run `fn` on mount, when `deps` change, and every `ms` so live paper activity shows
+// without a manual reload.
+function usePoll(fn: () => void, ms = 15000, deps: unknown[] = []) {
   const saved = useRef(fn);
   saved.current = fn;
   useEffect(() => {
     saved.current();
     const id = setInterval(() => saved.current(), ms);
     return () => clearInterval(id);
-  }, [ms]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ms, ...deps]);
 }
 
 // Minimal research-deck shell. Tabs map to the plan's pages; this scaffold wires the data
@@ -25,12 +27,25 @@ const card: React.CSSProperties = {
   padding: 16, margin: 8,
 };
 
+const MODES = ["backtest", "demo", "live"] as const;
+
 export function App() {
   const [tab, setTab] = useState<Tab>("Status");
+  // backtest = seeded/replay results; demo = live paper trades from your account; live = real.
+  const [mode, setMode] = useState<string>("backtest");
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
-      <h1 style={{ fontSize: 20 }}>ICT Trader — Research Deck</h1>
-      <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1 style={{ fontSize: 20 }}>ICT Trader — Research Deck</h1>
+        <label style={{ fontSize: 13 }}>
+          data:{" "}
+          <select value={mode} onChange={(e) => setMode(e.target.value)}
+            style={{ background: "#21262d", color: "#fff", border: "1px solid #30363d", padding: 4 }}>
+            {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </label>
+      </div>
+      <nav style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)}
             style={{ background: tab === t ? "#1f6feb" : "#21262d", color: "#fff",
@@ -40,9 +55,9 @@ export function App() {
         ))}
       </nav>
       {tab === "Status" && <StatusView />}
-      {tab === "Per-Bucket Analytics" && <BucketsView />}
-      {tab === "Equity" && <EquityView />}
-      {tab === "Trade Journal" && <JournalView />}
+      {tab === "Per-Bucket Analytics" && <BucketsView mode={mode} />}
+      {tab === "Equity" && <EquityView mode={mode} />}
+      {tab === "Trade Journal" && <JournalView mode={mode} />}
       {tab === "Control" && <ControlView />}
     </div>
   );
@@ -66,10 +81,10 @@ function StatusView() {
   );
 }
 
-function BucketsView() {
+function BucketsView({ mode }: { mode: string }) {
   const [sum, setSum] = useState<Summary | null>(null);
-  usePoll(() => { api.summary().then(setSum).catch(() => {}); });
-  if (!sum) return <div style={card}>run a backtest first (POST /api/backtest)…</div>;
+  usePoll(() => { api.summary(mode).then(setSum).catch(() => {}); }, 15000, [mode]);
+  if (!sum) return <div style={card}>no {mode} data yet — seed/backtest or run the engine…</div>;
   return (
     <div>
       <div style={card}>
@@ -101,9 +116,9 @@ function BucketsView() {
   );
 }
 
-function EquityView() {
+function EquityView({ mode }: { mode: string }) {
   const [eq, setEq] = useState<EquityPoint[]>([]);
-  usePoll(() => { api.equity().then(setEq).catch(() => {}); });
+  usePoll(() => { api.equity(mode).then(setEq).catch(() => {}); }, 15000, [mode]);
   const last = eq[eq.length - 1];
   return (
     <div style={card}>
@@ -115,12 +130,12 @@ function EquityView() {
   );
 }
 
-function JournalView() {
+function JournalView({ mode }: { mode: string }) {
   const [rows, setRows] = useState<any[]>([]);
-  usePoll(() => { api.trades().then(setRows).catch(() => {}); });
+  usePoll(() => { api.trades(mode).then(setRows).catch(() => {}); }, 15000, [mode]);
   return (
     <div style={card}>
-      <h2>Trade Journal ({rows.length})</h2>
+      <h2>Trade Journal ({rows.length}) · {mode}</h2>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead><tr><th>entry</th><th>side</th><th>R</th><th>killzone</th>
           <th>BE early?</th><th>exit</th></tr></thead>
