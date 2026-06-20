@@ -19,7 +19,7 @@ function usePoll(fn: () => void, ms = 15000, deps: unknown[] = []) {
 // lightweight-charts (added in package.json) on the Live Monitor tab — left as the next
 // build step since it needs the live bar feed.
 
-const TABS = ["Status", "Per-Bucket Analytics", "Equity", "Trade Journal", "Control"] as const;
+const TABS = ["Status", "Per-Bucket Analytics", "Equity", "Trade Journal", "Log Trade", "Control"] as const;
 type Tab = (typeof TABS)[number];
 
 const card: React.CSSProperties = {
@@ -58,6 +58,7 @@ export function App() {
       {tab === "Per-Bucket Analytics" && <BucketsView mode={mode} />}
       {tab === "Equity" && <EquityView mode={mode} />}
       {tab === "Trade Journal" && <JournalView mode={mode} />}
+      {tab === "Log Trade" && <LogTradeView />}
       {tab === "Control" && <ControlView />}
     </div>
   );
@@ -153,6 +154,75 @@ function JournalView({ mode }: { mode: string }) {
     </div>
   );
 }
+
+function LogTradeView() {
+  const [token, setToken] = useState("");
+  const [f, setF] = useState<Record<string, any>>({
+    side: "long", realized_r: 1.0, killzone: "ny_am", quarter_idx: 2,
+    path_clean: true, moved_to_be_early: false, exit_reason: "tp", note: "",
+  });
+  const [msg, setMsg] = useState("");
+  const set = (k: string, v: any) => setF((p) => ({ ...p, [k]: v }));
+  const submit = () =>
+    api.logTrade(token, { ...f, realized_r: Number(f.realized_r), quarter_idx: Number(f.quarter_idx), mode: "demo" })
+      .then((r) => setMsg("logged: " + JSON.stringify(r)))
+      .catch((e) => setMsg("error: " + String(e)));
+  return (
+    <div style={card}>
+      <h2>Log a paper trade → demo analytics</h2>
+      <p style={{ fontSize: 13, opacity: 0.8 }}>
+        Record each TradingView Paper-Trading fill here so it feeds the Per-Bucket / Equity /
+        Journal tabs (view them under <b>demo</b>). Be honest about <b>moved-to-breakeven-early</b> —
+        that bucket is the whole point.
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, maxWidth: 560 }}>
+        <label>side
+          <select value={f.side} onChange={(e) => set("side", e.target.value)} style={inp}>
+            <option value="long">long</option><option value="short">short</option>
+          </select></label>
+        <label>realized R
+          <input type="number" step="0.1" value={f.realized_r}
+            onChange={(e) => set("realized_r", e.target.value)} style={inp} /></label>
+        <label>killzone
+          <select value={f.killzone} onChange={(e) => set("killzone", e.target.value)} style={inp}>
+            <option value="ny_am">ny_am</option><option value="silver_bullet">silver_bullet</option>
+            <option value="lunch">lunch</option><option value="none">none</option>
+          </select></label>
+        <label>quarter idx
+          <input type="number" value={f.quarter_idx}
+            onChange={(e) => set("quarter_idx", e.target.value)} style={inp} /></label>
+        <label>exit reason
+          <select value={f.exit_reason} onChange={(e) => set("exit_reason", e.target.value)} style={inp}>
+            <option value="runner_target">runner_target</option><option value="tp">tp</option>
+            <option value="stop">stop</option><option value="be">be</option>
+            <option value="trail">trail</option><option value="manual">manual</option>
+          </select></label>
+        <label style={{ alignSelf: "end" }}>
+          <input type="checkbox" checked={f.path_clean}
+            onChange={(e) => set("path_clean", e.target.checked)} /> path clean</label>
+        <label style={{ alignSelf: "end" }}>
+          <input type="checkbox" checked={f.moved_to_be_early}
+            onChange={(e) => set("moved_to_be_early", e.target.checked)} /> moved to BE early ⚠️</label>
+        <label>note
+          <input value={f.note} onChange={(e) => set("note", e.target.value)} style={inp} /></label>
+      </div>
+      <div style={{ marginTop: 10 }}>
+        <input placeholder="control token" value={token} onChange={(e) => setToken(e.target.value)}
+          style={{ ...inp, width: 240 }} />
+        <button onClick={submit}
+          style={{ marginLeft: 8, background: "#1f6feb", color: "#fff", border: "none", padding: "6px 14px" }}>
+          Log trade
+        </button>
+      </div>
+      <p style={{ wordBreak: "break-all" }}>{msg}</p>
+    </div>
+  );
+}
+
+const inp: React.CSSProperties = {
+  display: "block", width: "100%", marginTop: 2, padding: 6,
+  background: "#0d1117", color: "#e6e6e6", border: "1px solid #30363d", borderRadius: 4,
+};
 
 function ControlView() {
   const [token, setToken] = useState("");

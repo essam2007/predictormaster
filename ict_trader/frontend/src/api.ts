@@ -47,4 +47,10 @@ export const api = {
     j<any>("/api/control/resume", { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   testBroker: (token: string) =>
     j<any>("/api/broker/test", { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+  logTrade: (token: string, body: Record<string, unknown>) =>
+    j<any>("/api/trades", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
 };

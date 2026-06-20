@@ -72,6 +72,25 @@ def test_pine_webhook(client):
     assert r.status_code == 200 and r.json()["ok"] is True
 
 
+def test_log_trade_feeds_demo_analytics(client):
+    c, _ = client
+    # unauth -> 401
+    assert c.post("/api/trades", json={"side": "long", "realized_r": 1.0}).status_code == 401
+    # log two demo trades: one clean winner, one early-breakeven loser
+    h = {"Authorization": "Bearer secret"}
+    assert c.post("/api/trades", headers=h, json={
+        "side": "long", "realized_r": 2.5, "killzone": "silver_bullet",
+        "path_clean": True, "moved_to_be_early": False, "exit_reason": "runner_target"}).status_code == 200
+    assert c.post("/api/trades", headers=h, json={
+        "side": "short", "realized_r": -1.0, "moved_to_be_early": True,
+        "exit_reason": "be"}).status_code == 200
+    # they show up under demo analytics, split by the breakeven bucket
+    summary = c.get("/api/analytics/summary?mode=demo").json()
+    assert summary["overall"]["n"] == 2
+    be = {b["label"]: b for b in summary["buckets"]["moved_to_be_early"]}
+    assert "be_early" in be and "no_be_early" in be
+
+
 def test_broker_test_requires_auth_and_reports_unconfigured(client, monkeypatch):
     c, _ = client
     # no auth -> 401

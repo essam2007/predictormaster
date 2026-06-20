@@ -51,6 +51,24 @@ class BacktestRequest(BaseModel):
     slippage: float = 0.25
 
 
+class LogTradeRequest(BaseModel):
+    """A manually-journaled trade (e.g. a TradingView Paper-Trading fill)."""
+
+    side: str = "long"
+    realized_r: float
+    realized_pnl: float | None = None
+    killzone: str = "ny_am"
+    day_of_week: int = -1
+    quarter_idx: int = -1
+    path_clean: bool = True
+    moved_to_be_early: bool = False
+    exit_reason: str = "tp"
+    entry_px: float = 0.0
+    exit_px: float | None = None
+    note: str = ""
+    mode: str = "demo"
+
+
 class PineAlert(BaseModel):
     source: str = "pine"
     secret: str | None = None
@@ -188,6 +206,46 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         _require_control(st, authorization)
         st.kill.deactivate()
         return {"active": st.kill.active}
+
+    @app.post("/api/trades")
+    async def log_trade(req: LogTradeRequest, authorization: str | None = Header(default=None),
+                        st: AppState = Depends(get_state)) -> dict:
+        """Journal a manual trade so it feeds the per-condition analytics (auth-gated)."""
+        _require_control(st, authorization)
+        from ..domain.enums import (
+            AMDPhase,
+            BreakevenTrigger,
+            ExitReason,
+            Killzone,
+            Side,
+            Symbol,
+        )
+        from ..domain.trades import Trade
+
+        def _enum(enum_cls, value, default):
+            try:
+                return enum_cls(value)
+            except ValueError:
+                return default
+
+        now = datetime.now(UTC)
+        dow = req.day_of_week if req.day_of_week >= 0 else now.weekday()
+        be = BreakevenTrigger.EARLY_PULLBACK if req.moved_to_be_early else BreakevenTrigger.STRUCTURAL_BREAK
+        trade = Trade(
+            symbol=Symbol.NQ, side=_enum(Side, req.side, Side.LONG), entry_ts=now,
+            entry_px=req.entry_px, qty_initial=1, mode=_enum(TradeMode, req.mode, TradeMode.DEMO),
+            exit_ts=now, exit_px=req.exit_px,
+            realized_pnl=req.realized_pnl if req.realized_pnl is not None else round(req.realized_r * 100, 2),
+            realized_r=req.realized_r, day_of_week=dow,
+            killzone=_enum(Killzone, req.killzone, Killzone.NY_AM), quarter_idx=req.quarter_idx,
+            amd_phase=AMDPhase.DISTRIBUTION, path_clean=req.path_clean,
+            moved_to_be_early=req.moved_to_be_early, be_trigger=be,
+            runner_held=not req.moved_to_be_early,
+            exit_reason=_enum(ExitReason, req.exit_reason, ExitReason.TP),
+        )
+        async with st.db.session() as s:
+            await Repository(s).add_trade(trade)
+        return {"ok": True, "mode": trade.mode.value, "realized_r": trade.realized_r}
 
     @app.post("/api/broker/test")
     async def broker_test(authorization: str | None = Header(default=None),
