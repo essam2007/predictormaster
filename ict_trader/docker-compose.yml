@@ -1,7 +1,17 @@
-# Local stack for the research deck. SQLite is the default (no DB container needed); the
-# postgres+timescale service is provided for the pre-live migration target — point
-# ICT_TRADER_DB_URL at it to use it.
+# One-command research deck:  docker compose up   ->  open http://127.0.0.1:8077
+# (builds the UI + API into one image; SQLite by default, persisted in the ./data volume).
+# The postgres+timescale service is for the pre-live migration target (profile "postgres").
 services:
+  deck:
+    build: { context: ., dockerfile: Dockerfile }   # multi-stage: builds UI + serves API
+    environment:
+      ICT_TRADER_API_HOST: "0.0.0.0"
+    env_file:
+      - path: .env
+        required: false
+    ports: ["8077:8077"]
+    volumes: ["./data:/app/data"]
+
   db:
     image: timescale/timescaledb:latest-pg16
     environment:
@@ -12,17 +22,13 @@ services:
     volumes: ["pgdata:/var/lib/postgresql/data"]
     profiles: ["postgres"]
 
-  api:
-    build: { context: ., dockerfile: Dockerfile.api }
-    env_file: [.env]
-    environment:
-      ICT_TRADER_API_HOST: "0.0.0.0"
-    ports: ["8077:8077"]
-
   engine:
     build: { context: ., dockerfile: Dockerfile.engine }
-    env_file: [.env]
-    depends_on: [api]
+    env_file:
+      - path: .env
+        required: false
+    depends_on: [deck]
+    profiles: ["engine"]
 
 volumes:
   pgdata: {}

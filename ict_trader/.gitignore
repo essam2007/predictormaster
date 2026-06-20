@@ -23,5 +23,8 @@ data/
 
 # frontend
 frontend/node_modules/
-frontend/dist/
 *.tsbuildinfo
+# frontend/dist/ is intentionally COMMITTED (re-included below) so the deck runs with
+# Python only — no Node needed. Rebuild + recommit it after any UI change.
+!frontend/dist/
+!frontend/dist/**
