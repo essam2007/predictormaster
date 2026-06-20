@@ -76,6 +76,18 @@ python scripts/run_all.py        # builds the UI (first run), seeds sample data,
 # open the printed URL (default http://127.0.0.1:8077) — UI + API on one port
 ```
 
+> The **interactive deck is a web server** — view it by running this on **your own
+> computer** and opening the URL. Isolated/headless environments (e.g. the Claude web
+> container) can't expose the port, so use the static report instead:
+
+```bash
+python scripts/report.py --mode demo --out report.html   # self-contained HTML, no server
+```
+
+`report.py` renders the same analytics (overall, per-bucket hit-rate/avg-R incl. the
+breakeven-leak, equity curve, journal, calibration) as a single openable file from your
+trades.
+
 `run_all.py` builds the React deck if needed, seeds illustrative sample trades when the
 store is empty (so the analytics tabs aren't blank), and serves the SPA + JSON API from a
 single port. Use `--no-seed` / `--no-build` to skip those.
