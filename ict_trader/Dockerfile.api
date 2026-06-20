@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+
+COPY pyproject.toml README.md ./
+COPY src ./src
+RUN pip install --upgrade pip && pip install ".[serve]"
+
+EXPOSE 8077
+CMD ["python", "-m", "uvicorn", "ict_trader.api.app:create_app", "--factory", \
+     "--host", "0.0.0.0", "--port", "8077"]

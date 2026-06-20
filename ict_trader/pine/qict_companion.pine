@@ -1,0 +1,82 @@
+//@version=6
+// ict-trader companion — VISUALIZATION + CONFIRMATION ONLY.
+//
+// This indicator mirrors what the Python engine detects so you can verify setups on your
+// TradingView chart (and on mobile). It does NOT place orders — the Python engine owns
+// execution to Tradovate, and those positions show up in TradingView's native Tradovate
+// broker panel. Optionally it fires a JSON webhook to the engine's /webhooks/pine endpoint
+// so the engine can cross-check ("hybrid" handshake).
+//
+// Run it on NQ; it pulls ES via request.security to draw the SMT divergence.
+indicator("ICT Quarterly Companion", overlay = true, max_boxes_count = 200,
+     max_lines_count = 200, max_labels_count = 200)
+
+// ---------------- inputs ----------------
+es_sym       = input.symbol("CME_MINI:ES1!", "Correlated symbol (ES)")
+show_fvg     = input.bool(true,  "Show fair value gaps")
+show_kz      = input.bool(true,  "Shade NY-AM killzone / Silver Bullet")
+min_fvg_ticks= input.float(1.0,  "Min FVG size (ticks)")
+send_webhook = input.bool(false, "Emit webhook JSON on confirmed setup")
+webhook_sec  = input.string("",  "Webhook shared secret")
+
+// ---------------- time (ET) ----------------
+// TradingView sessions are exchange-local; CME index futures are quoted in ET.
+in_kz   = not na(time(timeframe.period, "0700-1000", "America/New_York"))
+in_sb   = not na(time(timeframe.period, "1000-1100", "America/New_York"))
+in_news = not na(time(timeframe.period, "0830-0832", "America/New_York"))
+dow     = dayofweek(time, "America/New_York")
+avoid_day = dow == dayofweek.friday or dow == dayofweek.saturday or dow == dayofweek.sunday
+pref_day  = dow == dayofweek.tuesday or dow == dayofweek.wednesday
+
+bgcolor(show_kz and in_sb ? color.new(color.orange, 88) : na, title = "Silver Bullet")
+bgcolor(show_kz and in_kz and not in_sb ? color.new(color.blue, 92) : na, title = "NY-AM KZ")
+
+// ---------------- fair value gaps (NQ) ----------------
+tick = syminfo.mintick
+minsize = tick * min_fvg_ticks
+bull_fvg = low > high[2] and (low - high[2]) >= minsize
+bear_fvg = high < low[2] and (low[2] - high) >= minsize
+
+if show_fvg and bull_fvg
+    box.new(bar_index[2], low, bar_index, high[2],
+         border_color = color.new(color.green, 40), bgcolor = color.new(color.green, 85))
+if show_fvg and bear_fvg
+    box.new(bar_index[2], low[2], bar_index, high,
+         border_color = color.new(color.red, 40), bgcolor = color.new(color.red, 85))
+
+// ---------------- ES/NQ SMT divergence ----------------
+es_low  = request.security(es_sym, timeframe.period, low,  barmerge.gaps_off, barmerge.lookahead_off)
+es_high = request.security(es_sym, timeframe.period, high, barmerge.gaps_off, barmerge.lookahead_off)
+es_close= request.security(es_sym, timeframe.period, close,barmerge.gaps_off, barmerge.lookahead_off)
+
+// bullish SMT: NQ makes a lower low while ES holds (or vice-versa) over a short window
+nq_ll = low  < ta.lowest(low, 5)[1]
+es_ll = es_low < ta.lowest(es_low, 5)[1]
+bull_smt = (nq_ll != es_ll)
+nq_hh = high > ta.highest(high, 5)[1]
+es_hh = es_high > ta.highest(es_high, 5)[1]
+bear_smt = (nq_hh != es_hh)
+
+plotshape(bull_smt and barstate.isconfirmed, title = "Bull SMT", style = shape.triangleup,
+     location = location.belowbar, color = color.green, size = size.tiny)
+plotshape(bear_smt and barstate.isconfirmed, title = "Bear SMT", style = shape.triangledown,
+     location = location.abovebar, color = color.red, size = size.tiny)
+
+// candle-level PSP: opposing closes between NQ and ES at the same bar
+nq_up = close > open
+es_up = es_close > request.security(es_sym, timeframe.period, open, barmerge.gaps_off, barmerge.lookahead_off)
+psp = nq_up != es_up
+plotchar(psp and barstate.isconfirmed, title = "PSP", char = "•", location = location.top,
+     color = color.yellow, size = size.tiny)
+
+// ---------------- webhook (confirmation only) ----------------
+long_setup  = bull_fvg and bull_smt and in_kz and not in_news and not avoid_day
+short_setup = bear_fvg and bear_smt and in_kz and not in_news and not avoid_day
+
+var string msg = ""
+if send_webhook and barstate.isconfirmed and (long_setup or short_setup)
+    bias = long_setup ? "long" : "short"
+    msg := '{"source":"pine","secret":"' + webhook_sec + '","symbol":"NQ","bias":"' + bias +
+         '","components":{"fvg":true,"smt1":true,"psp":' + (psp ? "true" : "false") +
+         '},"killzone":"' + (in_sb ? "silver_bullet" : "ny_am") + '"}'
+    alert(msg, alert.freq_once_per_bar_close)

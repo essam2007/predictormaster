@@ -1,0 +1,30 @@
+# Confluence weights + gating + management. Mirrors confluence.scoring.DEFAULT_WEIGHTS
+# and ConfluenceAggregator defaults. We TRADE the full 9-component stack but LOG the
+# weighted score on every candidate so calibration can reveal which components carry edge.
+require_all: true        # all 9 components must be present to take an entry
+min_score_if_not_all: 0.7
+
+weights:
+  FVG: 0.15
+  SMT1: 0.15
+  SMT2: 0.10
+  PSP: 0.12
+  LTF_TRIGGER: 0.18
+  LRLR: 0.12
+  TIMING: 0.10
+  DAYFILTER: 0.05
+  MANAGEMENT: 0.03
+
+detectors:
+  fvg_min_ticks: 1.0
+  ifvg_stop_buffer_ticks: 2.0
+  swing_strength: 2
+  equal_level_tol_ticks: 4.0
+
+management:
+  tp1_fraction: 0.4      # scale-out at interim internal liquidity
+  tp2_fraction: 0.3
+  # runner held for ERL; breakeven ONLY after structural break or displacement (never on
+  # the first pullback). Trail behind structure.
+  breakeven_requires: ["structural_break", "displacement"]
+  displacement_mult: 1.8

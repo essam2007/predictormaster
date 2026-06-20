@@ -1,0 +1,9 @@
+# CME E-mini contract specs (mirrors ict_trader.config.INSTRUMENTS).
+ES:
+  tick_size: 0.25
+  tick_value: 12.50   # -> $50 / point
+  symbol: "ES1!"
+NQ:
+  tick_size: 0.25
+  tick_value: 5.00    # -> $20 / point
+  symbol: "NQ1!"

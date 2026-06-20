@@ -1,0 +1,23 @@
+# Session / killzone / quarter definitions (ET). Mirrors ict_trader.clock.SessionClock
+# defaults; kept here as the human-editable reference.
+timezone: "America/New_York"
+
+killzones:
+  ny_am:        ["07:00", "10:00"]
+  silver_bullet:["10:00", "11:00"]
+  lunch:        ["11:00", "13:30"]
+
+# 6-hour sessions, each split into 4 x 90-minute quarters.
+sessions:
+  asia:   "18:00"
+  london: "00:00"
+  ny_am:  "06:00"
+  ny_pm:  "12:00"
+
+# Hard-blocked high-impact windows (no entries). Enable per-date via an economic calendar.
+news_windows:
+  - ["08:30", "08:32"]   # CPI / NFP / PPI release spike
+
+day_filter:
+  preferred: ["Tue", "Wed"]
+  avoid:     ["Fri", "Sat", "Sun"]

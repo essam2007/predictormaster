@@ -1,0 +1,13 @@
+# Reference demo profile. The running process is configured via environment variables
+# (see .env.example / ict_trader.config.Settings); this file documents the demo values.
+mode: demo
+tradovate_base_url: "https://demo.tradovateapi.com/v1"
+tradovate_md_ws: "wss://md-demo.tradovateapi.com/v1/websocket"
+feed: tradovate            # tradovate | databento | replay
+symbol_traded: NQ
+
+risk:
+  per_trade_usd: 250
+  daily_loss_limit_usd: 750
+  max_concurrent_positions: 1
+  max_contracts: 3

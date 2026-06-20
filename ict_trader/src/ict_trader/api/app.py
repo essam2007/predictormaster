@@ -1,0 +1,213 @@
+"""FastAPI research-deck backend.
+
+Read-mostly views over the store (per-bucket analytics, trade journal, equity) plus a
+guarded control surface (kill switch) and the Pine webhook receiver. The frontend renders
+these; nothing here can place an order (the live engine owns execution).
+"""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+from typing import Any
+
+from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from ..analytics.calibration import component_lift, score_reliability
+from ..analytics.metrics import equity_curve, summarize
+from ..config import Settings, get_settings
+from ..domain.enums import Symbol, TradeMode
+from ..execution.kill_switch import KillSwitch
+from ..execution.risk import RiskEngine
+from ..store.db import Database
+from ..store.repositories import Repository
+from .ws import LiveHub
+
+
+class AppState:
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+        self.db = Database(settings.db_url)
+        self.kill = KillSwitch()
+        self.risk = RiskEngine()
+        self.hub = LiveHub()
+
+
+def _require_control(state: AppState, authorization: str | None) -> None:
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    if not state.settings.control_token or token != state.settings.control_token:
+        raise HTTPException(status_code=401, detail="control token required")
+
+
+class BacktestRequest(BaseModel):
+    es_csv: str
+    nq_csv: str
+    traded: str = "NQ"
+    slippage: float = 0.25
+
+
+class PineAlert(BaseModel):
+    source: str = "pine"
+    secret: str | None = None
+    symbol: str | None = None
+    bias: str | None = None
+    components: dict[str, Any] = {}
+    killzone: str | None = None
+    quarter: int | None = None
+    amd: str | None = None
+    entry: float | None = None
+    stop: float | None = None
+    erl_target: float | None = None
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or get_settings()
+    state = AppState(settings)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        await state.db.create_all()
+        yield
+        await state.db.dispose()
+
+    app = FastAPI(title="ict-trader research deck", version="0.1.0", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+    )
+    app.state.ict = state
+
+    def get_state() -> AppState:
+        return state
+
+    @app.get("/healthz")
+    async def healthz() -> dict:
+        return {"ok": True, "mode": settings.mode.value}
+
+    @app.get("/api/status")
+    async def status(st: AppState = Depends(get_state)) -> dict:
+        return {
+            "mode": st.settings.mode.value,
+            "is_live": st.settings.is_live,
+            "kill_switch": {"active": st.kill.active, "reason": st.kill.reason},
+            "risk": {
+                "daily_loss_used": st.risk.daily_loss_used,
+                "daily_loss_limit": st.risk.daily_loss_limit_usd,
+                "open_positions": st.risk.open_positions,
+                "halted": st.risk.halted,
+            },
+        }
+
+    @app.get("/api/analytics/summary")
+    async def analytics_summary(mode: str = "backtest", st: AppState = Depends(get_state)) -> dict:
+        async with st.db.session() as s:
+            trades = await Repository(s).list_trades(TradeMode(mode))
+        return summarize(trades)
+
+    @app.get("/api/analytics/equity")
+    async def analytics_equity(mode: str = "backtest", st: AppState = Depends(get_state)) -> list:
+        async with st.db.session() as s:
+            trades = await Repository(s).list_trades(TradeMode(mode))
+        return equity_curve(trades)
+
+    @app.get("/api/analytics/calibration")
+    async def analytics_calibration(mode: str = "backtest",
+                                    st: AppState = Depends(get_state)) -> dict:
+        async with st.db.session() as s:
+            repo = Repository(s)
+            trades = await repo.list_trades(TradeMode(mode))
+            setup_rows = await repo.list_setups(TradeMode(mode))
+        from ..domain.enums import AMDPhase, Killzone, Side
+        from ..domain.signals import SetupSnapshot
+        setups = [
+            SetupSnapshot(
+                ts=r.ts, bias=Side(r.bias), fvg_ok=r.fvg_ok, smt1_ok=r.smt1_ok,
+                smt2_ok=r.smt2_ok, psp_ok=r.psp_ok, ltf_trigger_ok=r.ltf_trigger_ok,
+                lrlr_ok=r.lrlr_ok, timing_ok=r.timing_ok, dayfilter_ok=r.dayfilter_ok,
+                management_ok=r.management_ok, daily_extreme_in=r.daily_extreme_in,
+                path_clean=r.path_clean, killzone=Killzone(r.killzone),
+                quarter_idx=r.quarter_idx, amd_phase=AMDPhase(r.amd_phase),
+                score=r.score, gated_pass=r.gated_pass,
+            ) for r in setup_rows
+        ]
+        return {"component_lift": component_lift(trades, setups),
+                "score_reliability": score_reliability(trades)}
+
+    @app.get("/api/trades")
+    async def list_trades(mode: str = "backtest", limit: int = 500,
+                          st: AppState = Depends(get_state)) -> list:
+        async with st.db.session() as s:
+            trades = await Repository(s).list_trades(TradeMode(mode))
+        return [
+            {
+                "entry_ts": t.entry_ts.isoformat(), "side": t.side.value,
+                "entry_px": t.entry_px, "exit_px": t.exit_px,
+                "realized_r": t.realized_r, "realized_pnl": t.realized_pnl,
+                "killzone": t.killzone.value, "quarter_idx": t.quarter_idx,
+                "day_of_week": t.day_of_week, "path_clean": t.path_clean,
+                "moved_to_be_early": t.moved_to_be_early,
+                "exit_reason": t.exit_reason.value if t.exit_reason else None,
+            }
+            for t in trades[:limit]
+        ]
+
+    @app.post("/api/backtest")
+    async def run_backtest(req: BacktestRequest, st: AppState = Depends(get_state)) -> dict:
+        import anyio
+
+        from ..backtest.harness import Backtester
+        from ..marketdata.replay import CsvReplayFeed
+
+        def _run():
+            feed = CsvReplayFeed(req.es_csv, req.nq_csv)
+            bt = Backtester(feed, traded=Symbol(req.traded), slippage_points=req.slippage)
+            return bt.run()
+
+        res = await anyio.to_thread.run_sync(_run)
+        async with st.db.session() as s:
+            repo = Repository(s)
+            await repo.add_setups(res.setups, TradeMode.BACKTEST)
+            await repo.add_trades(res.trades)
+        return {"n_setups": len(res.setups), "n_signals": res.n_signals,
+                "n_trades": res.n_trades, "summary": summarize(res.trades)}
+
+    @app.post("/api/control/kill")
+    async def kill(reason: str = "manual", authorization: str | None = Header(default=None),
+                   st: AppState = Depends(get_state)) -> dict:
+        _require_control(st, authorization)
+        st.kill.activate(reason)
+        return {"active": st.kill.active, "reason": st.kill.reason}
+
+    @app.post("/api/control/resume")
+    async def resume(authorization: str | None = Header(default=None),
+                     st: AppState = Depends(get_state)) -> dict:
+        _require_control(st, authorization)
+        st.kill.deactivate()
+        return {"active": st.kill.active}
+
+    @app.post("/webhooks/pine")
+    async def pine_webhook(alert: PineAlert, st: AppState = Depends(get_state)) -> dict:
+        if st.settings.webhook_secret and alert.secret != st.settings.webhook_secret:
+            raise HTTPException(status_code=403, detail="bad webhook secret")
+        async with st.db.session() as s:
+            await Repository(s).log_webhook(datetime.now(UTC),
+                                            alert.model_dump(exclude={"secret"}))
+        await st.hub.broadcast({"type": "pine_alert", "alert": alert.model_dump(exclude={"secret"})})
+        return {"ok": True}
+
+    @app.websocket("/ws")
+    async def ws_endpoint(ws: WebSocket) -> None:
+        await st_ws(state, ws)
+
+    return app
+
+
+async def st_ws(state: AppState, ws: WebSocket) -> None:
+    await state.hub.connect(ws)
+    try:
+        while True:
+            await ws.receive_text()
+    except Exception:  # noqa: BLE001
+        await state.hub.disconnect(ws)

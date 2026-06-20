@@ -1,0 +1,14 @@
+# Reference LIVE profile. Arming live additionally requires the env interlock
+# ICT_TRADER_LIVE_CONFIRM=I_UNDERSTAND_THE_RISK (see ict_trader.config). Size is forced
+# down and the daily-loss cap tightened until the strategy is validated on your own fills.
+mode: live
+tradovate_base_url: "https://live.tradovateapi.com/v1"
+tradovate_md_ws: "wss://md.tradovateapi.com/v1/websocket"
+feed: databento            # recommended live data source (Tradovate for execution only)
+symbol_traded: NQ
+
+risk:
+  per_trade_usd: 150
+  daily_loss_limit_usd: 300
+  max_concurrent_positions: 1
+  max_contracts: 1         # live_max_contracts — start at the minimum
