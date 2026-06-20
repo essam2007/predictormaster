@@ -45,4 +45,6 @@ export const api = {
     }),
   resume: (token: string) =>
     j<any>("/api/control/resume", { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+  testBroker: (token: string) =>
+    j<any>("/api/broker/test", { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
 };

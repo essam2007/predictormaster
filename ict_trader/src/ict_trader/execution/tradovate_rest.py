@@ -53,6 +53,10 @@ class TradovateREST:
     # -- auth ------------------------------------------------------------
     @retry(stop=stop_after_attempt(4), wait=wait_exponential(multiplier=2, max=16))
     async def authenticate(self) -> None:
+        await self._auth_once()
+
+    async def _auth_once(self) -> None:
+        """A single authentication attempt (no retry) — used by the engine and verify()."""
         payload = {
             "name": self.creds.name, "password": self.creds.password,
             "appId": self.creds.app_id, "appVersion": self.creds.app_version,
@@ -67,6 +71,18 @@ class TradovateREST:
         self.access_token = data["accessToken"]
         self.md_access_token = data.get("mdAccessToken")
         self.expires_at = _parse_expiry(data.get("expirationTime"))
+
+    async def verify(self) -> dict:
+        """Single-attempt connectivity check: authenticate + fetch the account.
+
+        Returns a structured result and never raises, so the UI / CLI can show status.
+        """
+        try:
+            await self._auth_once()
+            acct = await self.account_id()
+            return {"connected": True, "account_id": acct, "base_url": self.base_url}
+        except Exception as exc:  # noqa: BLE001
+            return {"connected": False, "error": str(exc), "base_url": self.base_url}
 
     async def renew(self) -> None:
         r = await self._client.post(f"{self.base_url}/auth/renewAccessToken",

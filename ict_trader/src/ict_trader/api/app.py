@@ -187,6 +187,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         st.kill.deactivate()
         return {"active": st.kill.active}
 
+    @app.post("/api/broker/test")
+    async def broker_test(authorization: str | None = Header(default=None),
+                          st: AppState = Depends(get_state)) -> dict:
+        """Authenticate against Tradovate (demo unless mode=live) and confirm the account.
+
+        Reads TRADOVATE_* creds from the environment; never returns the secrets.
+        """
+        _require_control(st, authorization)
+        import httpx
+
+        from ..config import get_tradovate_settings
+        from ..execution.tradovate_rest import TradovateCredentials, TradovateREST
+
+        ts = get_tradovate_settings()
+        if not ts.configured:
+            return {"connected": False, "mode": st.settings.mode.value,
+                    "error": "Tradovate credentials not set — fill TRADOVATE_* in .env"}
+        creds = TradovateCredentials(
+            name=ts.name, password=ts.password, app_id=ts.app_id,
+            app_version=ts.app_version, cid=ts.cid, sec=ts.secret, device_id=ts.device_id)
+        client = httpx.AsyncClient(timeout=8.0)
+        rest = TradovateREST(st.settings.tradovate_base_url, creds, client=client)
+        try:
+            result = await rest.verify()
+        finally:
+            await client.aclose()
+        result["mode"] = st.settings.mode.value
+        return result
+
     @app.post("/webhooks/pine")
     async def pine_webhook(alert: PineAlert, st: AppState = Depends(get_state)) -> dict:
         if st.settings.webhook_secret and alert.secret != st.settings.webhook_secret:

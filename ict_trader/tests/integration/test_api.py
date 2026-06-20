@@ -70,3 +70,19 @@ def test_pine_webhook(client):
     c, _ = client
     r = c.post("/webhooks/pine", json={"source": "pine", "symbol": "NQ", "bias": "long"})
     assert r.status_code == 200 and r.json()["ok"] is True
+
+
+def test_broker_test_requires_auth_and_reports_unconfigured(client, monkeypatch):
+    c, _ = client
+    # no auth -> 401
+    assert c.post("/api/broker/test").status_code == 401
+    # with auth but no creds set -> clear "not configured" (no network call)
+    from ict_trader import config
+    config.get_tradovate_settings.cache_clear()
+    for var in ("TRADOVATE_NAME", "TRADOVATE_PASSWORD", "TRADOVATE_CID", "TRADOVATE_SECRET"):
+        monkeypatch.delenv(var, raising=False)
+    r = c.post("/api/broker/test", headers={"Authorization": "Bearer secret"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["connected"] is False
+    assert "credentials not set" in body["error"]

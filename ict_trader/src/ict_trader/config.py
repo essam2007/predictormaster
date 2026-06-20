@@ -93,6 +93,27 @@ class Settings(BaseSettings):
         return self
 
 
+class TradovateSettings(BaseSettings):
+    """Tradovate API credentials, read from TRADOVATE_* env vars (see .env.example).
+
+    Kept free of any httpx/broker import so the pure core can still import ``config``.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="TRADOVATE_", env_file=".env", extra="ignore")
+
+    name: str = ""
+    password: str = ""
+    app_id: str = "ict-trader"
+    app_version: str = "0.1.0"
+    cid: str = ""
+    secret: str = ""
+    device_id: str = ""
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.name and self.password and self.cid and self.secret)
+
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
@@ -101,3 +122,8 @@ def get_settings() -> Settings:
 @lru_cache
 def get_risk_settings() -> RiskSettings:
     return RiskSettings()
+
+
+@lru_cache
+def get_tradovate_settings() -> TradovateSettings:
+    return TradovateSettings()

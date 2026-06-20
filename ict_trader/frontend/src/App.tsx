@@ -137,6 +137,10 @@ function ControlView() {
       <input placeholder="control token" value={token} onChange={(e) => setToken(e.target.value)}
         style={{ padding: 6, width: 280 }} />
       <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+        <button onClick={() => api.testBroker(token).then((r) => setMsg(JSON.stringify(r)))}
+          style={{ background: "#1f6feb", color: "#fff", border: "none", padding: "6px 12px" }}>
+          Test Tradovate connection
+        </button>
         <button onClick={() => api.kill(token).then((r) => setMsg(JSON.stringify(r)))}
           style={{ background: "#f85149", color: "#fff", border: "none", padding: "6px 12px" }}>
           KILL
@@ -146,7 +150,7 @@ function ControlView() {
           Resume
         </button>
       </div>
-      <p>{msg}</p>
+      <p style={{ wordBreak: "break-all" }}>{msg}</p>
     </div>
   );
 }
