@@ -7,6 +7,7 @@ these; nothing here can place an order (the live engine owns execution).
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -14,6 +15,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from ..analytics.calibration import component_lift, score_reliability
@@ -229,6 +231,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:
         await st_ws(state, ws)
+
+    # Serve the built research-deck SPA from FastAPI (one process, one port) when a build
+    # exists. API routes above are registered first, so they take precedence over this
+    # catch-all mount. Headless (no build) is fine — the JSON API still works.
+    static_dir = os.environ.get("ICT_TRADER_STATIC_DIR", "frontend/dist")
+    if os.path.isdir(static_dir):
+        app.mount("/", StaticFiles(directory=static_dir, html=True), name="deck")
 
     return app
 

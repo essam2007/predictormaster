@@ -67,10 +67,27 @@ pytest                                          # unit + e2e (no network)
 ruff check . && mypy
 ```
 
+## Run the research deck (one command)
+
+```bash
+cd ict_trader
+pip install -e ".[serve]"
+python scripts/run_all.py        # builds the UI (first run), seeds sample data, serves both
+# open the printed URL (default http://127.0.0.1:8077) — UI + API on one port
+```
+
+`run_all.py` builds the React deck if needed, seeds illustrative sample trades when the
+store is empty (so the analytics tabs aren't blank), and serves the SPA + JSON API from a
+single port. Use `--no-seed` / `--no-build` to skip those.
+
+To connect your Tradovate account (demo first): put `TRADOVATE_*` in `.env`, then
+`python scripts/test_tradovate.py` (or the **Test Tradovate connection** button on the
+deck's Control tab — set `ICT_TRADER_CONTROL_TOKEN` first).
+
 ## Backtest
 
 ```bash
-ict-backtest --csv-es data/es_1m.csv --csv-nq data/nq_1m.csv --date 2024-05-14
+ict-backtest --csv-es data/es_1m.csv --csv-nq data/nq_1m.csv
 # writes setups/trades into the store; inspect via the analytics module / research deck
 ```
 

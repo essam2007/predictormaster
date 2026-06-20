@@ -108,6 +108,9 @@ class TradovateSettings(BaseSettings):
     cid: str = ""
     secret: str = ""
     device_id: str = ""
+    # Market-data contract symbols (override per expiry, e.g. ESM5 / NQM5).
+    es_symbol: str = "ES"
+    nq_symbol: str = "NQ"
 
     @property
     def configured(self) -> bool:
