@@ -38,11 +38,39 @@ async def _run(args: argparse.Namespace) -> None:
         mode=settings.mode,
         dry_run=not args.arm,
     )
+    await _wire_persistence(engine, settings)
     if args.replay_es and args.replay_nq:
         feed = CsvReplayFeed(args.replay_es, args.replay_nq)
         await engine.run(feed.stream())
     else:
         raise SystemExit("Live market-data feed wiring is a Phase-3 task; use --replay-* for paper.")
+
+
+async def _wire_persistence(engine, settings) -> None:
+    """Subscribe DB sinks so paper setups/trades land in the store the deck reads from.
+
+    No-ops (with a warning) if the [serve] extra isn't installed.
+    """
+    try:
+        from ict_trader.store.db import Database
+        from ict_trader.store.repositories import Repository
+    except ImportError:
+        logging.warning("store unavailable (install .[serve]); running without persistence")
+        return
+
+    db = Database(settings.db_url)
+    await db.create_all()
+
+    async def persist_setup(snap) -> None:
+        async with db.session() as s:
+            await Repository(s).add_setups([snap], settings.mode)
+
+    async def persist_trade(trade) -> None:
+        async with db.session() as s:
+            await Repository(s).add_trade(trade)
+
+    engine.bus.subscribe("setup", persist_setup)
+    engine.bus.subscribe("trade", persist_trade)
 
 
 def main() -> None:

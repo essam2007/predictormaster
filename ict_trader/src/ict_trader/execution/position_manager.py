@@ -51,6 +51,7 @@ class ManagedPosition:
 @dataclass
 class ManageDecision:
     take_partial_qty: int = 0
+    level: float | None = None  # limit price for a partial scale-out
     new_stop: float | None = None
     exit_all: bool = False
     exit_reason: ExitReason | None = None
@@ -101,6 +102,7 @@ class PositionManager:
             if qty > 0:
                 pos.tp1_taken = True
                 decision.take_partial_qty = qty
+                decision.level = intent.tp1_px
                 decision.note = "tp1"
                 return decision
             pos.tp1_taken = True
@@ -110,6 +112,7 @@ class PositionManager:
             if qty > 0:
                 pos.tp2_taken = True
                 decision.take_partial_qty = qty
+                decision.level = intent.tp2_px
                 decision.note = "tp2"
                 return decision
             pos.tp2_taken = True
