@@ -48,6 +48,11 @@ dev = [
 llm = [
     "anthropic>=0.40",
 ]
+# Chart rendering for scripts/scan_setups.py (annotated setup PNGs). Kept out of the core so the
+# deck/tests need no plotting dependency.
+charts = [
+    "matplotlib>=3.8",
+]
 
 [project.scripts]
 ict-backtest = "ict_trader.backtest.cli:main"

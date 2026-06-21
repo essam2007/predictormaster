@@ -22,12 +22,14 @@ and teach the grading model — far faster. This is the engine of the Training-P
 **Acceptance:** from a week of data, the trader can review + rate ~20–50 surfaced setups in a few
 minutes, and the labeled rows export to JSONL/CSV for model training.
 
-**Build sketch:**
-- `analytics/setup_scanner.py` — slide the detectors over co-bars, emit ranked candidate setups
-  (reuse `trade_analyzer` + the backtest harness).
-- `POST /api/setups/scan` (range/mode) → candidates; `POST /api/setups/{id}/rate` → labeled row.
-- Frontend **Review** tab: card-at-a-time, annotated chart, keyboard rating.
-- Depends on the chart-image/overlay annotator (below).
+**Build sketch / status:**
+- ✅ `analytics/setup_scanner.py` — slides the IFVG trigger + ES↔NQ SMT + `trade_analyzer` over
+  aligned co-bars, returns ranked candidates (built).
+- ✅ `scripts/scan_setups.py` — CLI that scans `data/*.csv`, renders annotated PNGs, writes a
+  markdown summary (built; matplotlib `[charts]` extra).
+- ⬜ `POST /api/setups/scan` (range/mode) → candidates; `POST /api/setups/{id}/rate` → labeled row.
+- ⬜ Frontend **Review** tab: card-at-a-time, annotated chart, keyboard rating (1–5 / t-p / Enter).
+- ⬜ Persist ratings as labeled dataset rows + feed calibration.
 
 ## Other open items
 - **Chart-image / overlay annotator** — render any setup's bars to an annotated PNG (FVG/IFVG
