@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, type Status, type Summary, type EquityPoint } from "./api";
+import { api, type Status, type Summary, type EquityPoint, type WebhookAlert } from "./api";
 
 // Re-run `fn` on mount, when `deps` change, and every `ms` so live paper activity shows
 // without a manual reload.
@@ -19,7 +19,7 @@ function usePoll(fn: () => void, ms = 15000, deps: unknown[] = []) {
 // lightweight-charts (added in package.json) on the Live Monitor tab — left as the next
 // build step since it needs the live bar feed.
 
-const TABS = ["Status", "Per-Bucket Analytics", "Equity", "Trade Journal", "Log Trade", "Control"] as const;
+const TABS = ["Status", "Signals", "Per-Bucket Analytics", "Equity", "Trade Journal", "Log Trade", "Control"] as const;
 type Tab = (typeof TABS)[number];
 
 const card: React.CSSProperties = {
@@ -55,6 +55,7 @@ export function App() {
         ))}
       </nav>
       {tab === "Status" && <StatusView />}
+      {tab === "Signals" && <SignalsView />}
       {tab === "Per-Bucket Analytics" && <BucketsView mode={mode} />}
       {tab === "Equity" && <EquityView mode={mode} />}
       {tab === "Trade Journal" && <JournalView mode={mode} />}
@@ -74,10 +75,56 @@ function StatusView() {
     <div style={card}>
       <h2>Engine</h2>
       <p>Mode: <b style={{ color: s.is_live ? "#f85149" : "#3fb950" }}>{s.mode}</b></p>
+      <p>In-process engine (Tradovate API): {s.engine_running
+        ? <b style={{ color: "#3fb950" }}>running</b>
+        : <span style={{ opacity: 0.7 }}>off (needs Tradovate API creds — not available on demo)</span>}</p>
+      <p style={{ fontSize: 13, opacity: 0.8 }}>
+        On a demo-only setup, data flows in via the <b>TradingView webhook</b> instead — see the
+        <b> Signals</b> tab. Closed strategy trades land under the <b>demo</b> selector.
+      </p>
       <p>Kill switch: {s.kill_switch.active ? `ACTIVE (${s.kill_switch.reason})` : "off"}</p>
       <p>Daily loss: {s.risk.daily_loss_used} / {s.risk.daily_loss_limit}
          {s.risk.halted && " — HALTED"}</p>
       <p>Open positions: {s.risk.open_positions}</p>
+    </div>
+  );
+}
+
+function SignalsView() {
+  const [rows, setRows] = useState<WebhookAlert[]>([]);
+  const [err, setErr] = useState("");
+  usePoll(() => { api.webhooks(100).then(setRows).catch((e) => setErr(String(e))); }, 10000);
+  return (
+    <div style={card}>
+      <h2>TradingView signals → webhook ({rows.length})</h2>
+      <p style={{ fontSize: 13, opacity: 0.8 }}>
+        Alerts arriving at <code>/webhooks/pine</code> from the Pine indicator/strategy. A
+        <b> trade</b> row (kind=trade) is also logged as a demo trade and feeds the analytics;
+        a <b>signal</b> row is just a setup notification.
+      </p>
+      {err && <p style={{ color: "#f85149" }}>{err}</p>}
+      {rows.length === 0 && <p style={{ opacity: 0.7 }}>
+        no alerts yet — add a TradingView alert on the ICT companion/strategy with this deck's
+        webhook URL (see TRADINGVIEW.md).</p>}
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead><tr><th align="left">time</th><th>kind</th><th>side</th><th>R</th>
+          <th>killzone</th><th>BE early?</th><th>exit</th></tr></thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i}>
+              <td>{r.ts}</td>
+              <td align="center">{r.kind === "trade"
+                ? <b style={{ color: "#1f6feb" }}>trade</b> : (r.kind ?? "signal")}</td>
+              <td align="center">{r.side ?? r.bias ?? "—"}</td>
+              <td align="center" style={{ color: (r.realized_r ?? 0) >= 0 ? "#3fb950" : "#f85149" }}>
+                {r.realized_r ?? "—"}</td>
+              <td align="center">{r.killzone ?? "—"}</td>
+              <td align="center">{r.moved_to_be_early ? "⚠️" : "—"}</td>
+              <td align="center">{r.exit_reason ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

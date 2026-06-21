@@ -1,0 +1,195 @@
+//@version=6
+// ICT Quarterly STRATEGY — the "TradingView wrapper" for demo-only data capture.
+//
+// WHY THIS EXISTS
+// Tradovate's REST/WS API needs a funded live account, so on a pure demo you cannot drive
+// orders from Python. The one OFFICIAL way to get data out of TradingView is a webhook
+// alert. This strategy encodes the executable subset of the ICT + Quarterly-Theory model
+// and, on every closed trade, POSTs a JSON webhook to the research deck (/webhooks/pine,
+// kind="trade"). The deck logs it as a DEMO trade so the per-condition analytics accrue
+// with NO broker API at all. You run it on your TradingView charts with your futures data;
+// the deck does the analytics.
+//
+// THE HEADLINE EXPERIMENT
+// The "Move to breakeven early?" input toggles the documented flaw (capping the runner by
+// moving to BE on the first pullback). Run the Strategy Tester both ways — TradingView's own
+// report quantifies the leak, AND each closed trade is tagged moved_to_be_early so the deck's
+// "moved_to_be_early" bucket shows it too.
+//
+// HONESTY: this is a SIMPLIFIED approximation of the Python engine (no nested SMT, no true
+// low-resistance-path scan, single-unit position — no partials). The engine in this repo is
+// the faithful detector; this is the data-capture front end for demo trading.
+//
+// SETUP: Pine Editor -> paste -> Add to chart on CME_MINI:NQ1! (1m–5m) -> set the ES input
+// and your webhook secret -> Strategy Tester to backtest -> create an Alert with condition
+// "ICT Quarterly STRATEGY" and "alert() function calls only", Webhook URL =
+// https://<your-deck>.onrender.com/webhooks/pine .
+strategy("ICT Quarterly STRATEGY", overlay = true, pyramiding = 0,
+     default_qty_type = strategy.fixed, default_qty_value = 1,
+     initial_capital = 50000, calc_on_every_tick = false,
+     max_boxes_count = 80, max_lines_count = 40, max_labels_count = 80)
+
+// ---------------- inputs ----------------
+es_sym        = input.symbol("CME_MINI:ES1!", "Correlated symbol (ES)")
+min_fvg_ticks = input.float(2.0,  "Min FVG size (ticks)", group = "Setup")
+buf_ticks     = input.float(2.0,  "Stop buffer (ticks)",  group = "Setup")
+move_be_early = input.bool(false, "Move to breakeven early? (the documented flaw)",
+     group = "Management",
+     tooltip = "OFF = hold the original stop and let the runner reach ERL (correct). " +
+     "ON = move stop to entry after +1R (caps the runner). Toggle to quantify the leak.")
+be_after_r    = input.float(1.0,  "…after this many R in favor", group = "Management")
+secret_in     = input.string("",  "Webhook shared secret", group = "Webhook",
+     tooltip = "Paste ICT_TRADER_WEBHOOK_SECRET from your deck (Render env var). Leave blank if unset.")
+show_kz       = input.bool(true,  "Killzone / Silver Bullet shading", group = "Visuals")
+
+tick    = syminfo.mintick
+minsize = tick * min_fvg_ticks
+
+// ---------------- time (ET) ----------------
+in_kz   = not na(time(timeframe.period, "0700-1000", "America/New_York"))
+in_sb   = not na(time(timeframe.period, "1000-1100", "America/New_York"))
+in_news = not na(time(timeframe.period, "0830-0832", "America/New_York"))
+dow     = dayofweek(time, "America/New_York")
+avoid_day = dow == dayofweek.friday or dow == dayofweek.saturday or dow == dayofweek.sunday
+tradeable_time = (in_kz or in_sb) and not in_news and not avoid_day
+
+bgcolor(show_kz and in_sb ? color.new(color.orange, 90) : na, title = "Silver Bullet")
+bgcolor(show_kz and in_kz and not in_sb ? color.new(color.blue, 93) : na, title = "NY-AM KZ")
+
+// quarter index (0..3) within the 06:00–12:00 ET window; -1 outside
+et_h   = hour(time, "America/New_York")
+et_m   = minute(time, "America/New_York")
+mins   = (et_h - 6) * 60 + et_m
+q_idx  = (mins >= 0 and mins < 360) ? math.floor(mins / 90) : -1
+// TradingView dow (1=Sun..7=Sat) -> Python weekday (0=Mon..6=Sun)
+py_dow = (dow + 5) % 7
+
+// ---------------- ERL (prior-day high/low) = runner target ----------------
+pdh = request.security(syminfo.tickerid, "D", high[1], lookahead = barmerge.lookahead_on)
+pdl = request.security(syminfo.tickerid, "D", low[1],  lookahead = barmerge.lookahead_on)
+
+// ---------------- fair value gaps (chart symbol) ----------------
+bull_fvg = low > high[2] and (low - high[2]) >= minsize
+bear_fvg = high < low[2] and (low[2] - high) >= minsize
+
+// ---------------- inverse FVG (body-close-through) -> entry trigger ----------------
+var float bear_lo = na, var float bear_hi = na
+var float bull_lo = na, var float bull_hi = na
+if bear_fvg
+    bear_lo := high, bear_hi := low[2]
+if bull_fvg
+    bull_lo := high[2], bull_hi := low
+
+bull_ifvg = not na(bear_hi) and close > bear_hi      // bearish FVG flipped up -> bullish
+bear_ifvg = not na(bull_lo) and close < bull_lo      // bullish FVG flipped down -> bearish
+if bull_ifvg
+    bear_hi := na
+if bear_ifvg
+    bull_lo := na
+
+// ---------------- ES/NQ SMT + PSP ----------------
+es_low   = request.security(es_sym, timeframe.period, low,   barmerge.gaps_off, barmerge.lookahead_off)
+es_high  = request.security(es_sym, timeframe.period, high,  barmerge.gaps_off, barmerge.lookahead_off)
+es_open  = request.security(es_sym, timeframe.period, open,  barmerge.gaps_off, barmerge.lookahead_off)
+es_close = request.security(es_sym, timeframe.period, close, barmerge.gaps_off, barmerge.lookahead_off)
+
+nq_ll = low  < ta.lowest(low, 5)[1]
+es_ll = es_low < ta.lowest(es_low, 5)[1]
+bull_smt = nq_ll != es_ll
+nq_hh = high > ta.highest(high, 5)[1]
+es_hh = es_high > ta.highest(es_high, 5)[1]
+bear_smt = nq_hh != es_hh
+psp = (close > open) != (es_close > es_open)
+
+// ---------------- composite signal ----------------
+long_sig  = barstate.isconfirmed and tradeable_time and bull_ifvg and bull_smt and psp
+short_sig = barstate.isconfirmed and tradeable_time and bear_ifvg and bear_smt and psp
+
+long_entry  = close
+long_stop   = not na(bear_lo) ? bear_lo - buf_ticks * tick : low  - buf_ticks * tick
+short_entry = close
+short_stop  = not na(bull_hi) ? bull_hi + buf_ticks * tick : high + buf_ticks * tick
+
+// ---------------- position state (for clean per-trade R + webhook) ----------------
+var float entry_px = na
+var float risk_pts = na
+var float target   = na
+var bool  is_long  = na
+var bool  be_moved = false
+var int   kz_q     = -1
+var int   kz_dow   = -1
+var bool  kz_sb    = false
+
+flat = strategy.position_size == 0
+
+// --- entries (only when flat) ---
+if long_sig and flat and long_entry > long_stop
+    entry_px := long_entry
+    risk_pts := long_entry - long_stop
+    target   := pdh
+    is_long  := true
+    be_moved := false
+    kz_q     := q_idx
+    kz_dow   := py_dow
+    kz_sb    := in_sb
+    strategy.entry("L", strategy.long)
+    if secret_in != ""
+        alert("ICT LONG " + syminfo.ticker + " entry ~" + str.tostring(long_entry, format.mintick) +
+             " stop " + str.tostring(long_stop, format.mintick) + " target PDH " +
+             str.tostring(pdh, format.mintick), alert.freq_once_per_bar_close)
+
+if short_sig and flat and short_entry < short_stop
+    entry_px := short_entry
+    risk_pts := short_stop - short_entry
+    target   := pdl
+    is_long  := false
+    be_moved := false
+    kz_q     := q_idx
+    kz_dow   := py_dow
+    kz_sb    := in_sb
+    strategy.entry("S", strategy.short)
+    if secret_in != ""
+        alert("ICT SHORT " + syminfo.ticker + " entry ~" + str.tostring(short_entry, format.mintick) +
+             " stop " + str.tostring(short_stop, format.mintick) + " target PDL " +
+             str.tostring(pdl, format.mintick), alert.freq_once_per_bar_close)
+
+// --- management: optional early-BE (the flaw) vs hold-the-runner ---
+if strategy.position_size != 0 and not na(entry_px)
+    cur_stop = is_long ? entry_px - risk_pts : entry_px + risk_pts
+    if move_be_early and not be_moved
+        moved_favor = is_long ? (high - entry_px) >= be_after_r * risk_pts
+                              : (entry_px - low)  >= be_after_r * risk_pts
+        if moved_favor
+            be_moved := true
+    if be_moved
+        cur_stop := entry_px      // capped at breakeven — the documented leak
+    if is_long
+        strategy.exit("xL", from_entry = "L", stop = cur_stop, limit = target)
+    else
+        strategy.exit("xS", from_entry = "S", stop = cur_stop, limit = target)
+
+// ---------------- on close: compute R, classify, fire trade webhook ----------------
+just_closed = flat and strategy.position_size[1] != 0 and not na(entry_px)
+if just_closed
+    n        = strategy.closedtrades
+    exit_px  = strategy.closedtrades.exit_price(n - 1)
+    r_real   = risk_pts > 0 ? ((is_long ? exit_px - entry_px : entry_px - exit_px) / risk_pts) : 0.0
+    reason   = math.abs(exit_px - target) <= 2 * tick ? "runner_target" :
+                 (be_moved and math.abs(exit_px - entry_px) <= 0.25 * risk_pts ? "be" : "stop")
+    side_str = is_long ? "long" : "short"
+    kz_str   = kz_sb ? "silver_bullet" : "ny_am"
+    be_str   = be_moved ? "true" : "false"
+    msg = '{"source":"pine","kind":"trade","secret":"' + secret_in + '"' +
+         ',"symbol":"' + syminfo.ticker + '","side":"' + side_str + '"' +
+         ',"entry":' + str.tostring(entry_px) + ',"exit":' + str.tostring(exit_px) +
+         ',"realized_r":' + str.tostring(r_real) +
+         ',"killzone":"' + kz_str + '","quarter":' + str.tostring(kz_q) +
+         ',"day_of_week":' + str.tostring(kz_dow) +
+         ',"moved_to_be_early":' + be_str + ',"path_clean":true' +
+         ',"exit_reason":"' + reason + '"}'
+    if secret_in != ""
+        alert(msg, alert.freq_once_per_bar_close)
+    entry_px := na
+
+plot(strategy.position_size != 0 and not na(target) ? target : na, "ERL target",
+     color = color.teal, style = plot.style_linebr)

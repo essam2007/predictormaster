@@ -103,6 +103,10 @@ class Repository:
         self.s.add(WebhookAlertRow(ts=ts, source="pine", payload=payload, matched=matched))
         await self.s.commit()
 
+    async def list_webhooks(self, limit: int = 100) -> list[WebhookAlertRow]:
+        stmt = select(WebhookAlertRow).order_by(WebhookAlertRow.ts.desc()).limit(limit)
+        return list((await self.s.execute(stmt)).scalars().all())
+
     async def add_order(self, row: OrderRow) -> None:
         self.s.add(row)
         await self.s.commit()

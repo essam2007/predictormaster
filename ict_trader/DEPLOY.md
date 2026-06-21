@@ -17,41 +17,32 @@ takes ~30–60s) and its data is ephemeral (sample data reseeds on each boot).
 4. When it's live, Render gives you a URL like **`https://ict-trader-deck.onrender.com`** —
    that's your clickable deck. Open it: the analytics tabs are pre-seeded.
 
-## Connect your Tradovate (demo) account
+## Demo-only? Leave the Tradovate fields blank.
 
-In the Render dashboard → your service → **Environment**, set these (they were created as
-"sync:false" so they're never in git):
+Tradovate's API needs a **funded live** account (the ~$1k minimum / API Access add-on), so a
+pure demo can't connect Python to Tradovate. **That's fine** — on a demo you feed the deck
+through the **TradingView webhook** instead (next section). Leave all `TRADOVATE_*` env fields
+empty; the blueprint pins `ICT_TRADER_ENGINE_AUTOSTART=false` and the deck runs perfectly
+without them.
 
-```
-TRADOVATE_NAME      your Tradovate login
-TRADOVATE_PASSWORD  your password
-TRADOVATE_CID       from your Tradovate API app
-TRADOVATE_SECRET    from your Tradovate API app
-TRADOVATE_ES_SYMBOL ESM5   (current front-month, optional)
-TRADOVATE_NQ_SYMBOL NQM5
-```
+*(If you ever DO get Tradovate API creds, set `TRADOVATE_NAME / PASSWORD / CID / SECRET` in
+Environment and flip `ICT_TRADER_ENGINE_AUTOSTART=true` — the deck will then auto-stream your
+demo data and paper-trade in-process, and Status shows `engine_running: true`.)*
 
-Save → Render redeploys. The blueprint sets `ICT_TRADER_ENGINE_AUTOSTART=true`, so once your
-creds are present the hosted deck **automatically connects to your Tradovate DEMO account,
-streams ES/NQ data, and paper-trades** the strategy — its setups/trades show up under the
-**demo** data selector, and **Status** shows `engine_running: true`. To verify the link
-manually: on the **Control** tab paste the **control token** (find it under Environment as
-`ICT_TRADER_CONTROL_TOKEN`) and click **Test Tradovate connection**. It stays PAPER (no real
-orders) on the public host.
+## Connect TradingView (webhook) — the demo data path
 
-## Connect your TradingView demo (webhook)
+This is how your trades reach the deck with **no broker API**:
 
-Your TradingView Paper-Trading signals can flow into the same hosted deck:
-
-1. In TradingView, add an alert on the **ICT Quarterly Companion** indicator (Once Per Bar
-   Close). Set the alert's **Webhook URL** to:
+1. Note the auto-generated **`ICT_TRADER_WEBHOOK_SECRET`** in Render → Environment.
+2. In TradingView, run `ict_trader/pine/qict_strategy.pine` (the **strategy** — auto-captures
+   fills) or `qict_companion.pine` (indicator — you journal manually). Paste the secret into
+   its **Webhook shared secret** input.
+3. Add a TradingView **alert** → trigger **"alert() function calls only"** (strategy) or
+   **Once Per Bar Close** (indicator) → **Webhook URL**:
    `https://<your-deck>.onrender.com/webhooks/pine`
-2. Make the alert message JSON include your webhook secret, e.g.
-   `{"source":"pine","secret":"<ICT_TRADER_WEBHOOK_SECRET from Render>","symbol":"NQ","bias":"long"}`
-   (the indicator's built-in webhook message already has this shape — paste your secret into
-   its "Webhook shared secret" input).
-3. Alerts now land in the deck (logged + pushed live), so your TradingView demo and the
-   Tradovate demo engine feed the same analytics.
+4. Each closed strategy trade now lands in the deck as a **demo** trade — visible under the
+   **Signals**, **Trade Journal**, **Per-Bucket** and **Equity** tabs. Full step-by-step:
+   `ict_trader/TRADINGVIEW.md`.
 
 ## Safety
 - The blueprint pins `ICT_TRADER_MODE=demo`. **Never** set it to `live` on a public host.

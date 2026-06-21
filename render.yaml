@@ -16,7 +16,9 @@ services:
       - key: ICT_TRADER_MODE
         value: demo                 # NEVER set live on a public host
       - key: ICT_TRADER_ENGINE_AUTOSTART
-        value: "true"               # stream Tradovate DEMO + paper-trade once creds are set
+        value: "false"              # Tradovate API needs a funded live acct; demo uses the
+                                    # TradingView webhook instead. Flip to "true" only if you
+                                    # have API creds (no-ops safely without them).
       - key: ICT_TRADER_CONTROL_TOKEN
         generateValue: true         # auto-generated; read it in the Render dashboard
       - key: ICT_TRADER_WEBHOOK_SECRET

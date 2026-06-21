@@ -23,7 +23,16 @@ from pydantic import BaseModel
 from ..analytics.calibration import component_lift, score_reliability
 from ..analytics.metrics import equity_curve, summarize
 from ..config import Settings, get_settings
-from ..domain.enums import Symbol, TradeMode
+from ..domain.enums import (
+    AMDPhase,
+    BreakevenTrigger,
+    ExitReason,
+    Killzone,
+    Side,
+    Symbol,
+    TradeMode,
+)
+from ..domain.trades import Trade
 from ..execution.kill_switch import KillSwitch
 from ..execution.risk import RiskEngine
 from ..store.db import Database
@@ -47,6 +56,59 @@ def _require_control(state: AppState, authorization: str | None) -> None:
     expected = state.settings.control_token
     if not expected or not hmac.compare_digest(token, expected):
         raise HTTPException(status_code=401, detail="control token required")
+
+
+def _enum(enum_cls: Any, value: Any, default: Any) -> Any:
+    try:
+        return enum_cls(value)
+    except (ValueError, KeyError):
+        return default
+
+
+def _make_trade(
+    *,
+    side: str,
+    realized_r: float,
+    mode: str,
+    killzone: str,
+    quarter_idx: int,
+    day_of_week: int,
+    path_clean: bool,
+    moved_to_be_early: bool,
+    exit_reason: str,
+    entry_px: float = 0.0,
+    exit_px: float | None = None,
+    realized_pnl: float | None = None,
+) -> Trade:
+    """Build a realized Trade from journaled/webhook fields (shared by both sources)."""
+    now = datetime.now(UTC)
+    dow = day_of_week if day_of_week >= 0 else now.weekday()
+    be = (
+        BreakevenTrigger.EARLY_PULLBACK
+        if moved_to_be_early
+        else BreakevenTrigger.STRUCTURAL_BREAK
+    )
+    return Trade(
+        symbol=Symbol.NQ,
+        side=_enum(Side, side, Side.LONG),
+        entry_ts=now,
+        entry_px=entry_px,
+        qty_initial=1,
+        mode=_enum(TradeMode, mode, TradeMode.DEMO),
+        exit_ts=now,
+        exit_px=exit_px,
+        realized_pnl=realized_pnl if realized_pnl is not None else round(realized_r * 100, 2),
+        realized_r=realized_r,
+        day_of_week=dow,
+        killzone=_enum(Killzone, killzone, Killzone.NY_AM),
+        quarter_idx=quarter_idx,
+        amd_phase=AMDPhase.DISTRIBUTION,
+        path_clean=path_clean,
+        moved_to_be_early=moved_to_be_early,
+        be_trigger=be,
+        runner_held=not moved_to_be_early,
+        exit_reason=_enum(ExitReason, exit_reason, ExitReason.TP),
+    )
 
 
 class BacktestRequest(BaseModel):
@@ -77,6 +139,7 @@ class LogTradeRequest(BaseModel):
 class PineAlert(BaseModel):
     source: str = "pine"
     secret: str | None = None
+    kind: str = "signal"  # "signal" (a setup) or "trade" (a closed round-trip from a strategy)
     symbol: str | None = None
     bias: str | None = None
     components: dict[str, Any] = {}
@@ -86,6 +149,16 @@ class PineAlert(BaseModel):
     entry: float | None = None
     stop: float | None = None
     erl_target: float | None = None
+    # trade-event fields (kind == "trade"): a TradingView strategy posts these on each fill
+    # so the per-condition analytics accrue with no broker API.
+    side: str | None = None
+    exit: float | None = None
+    realized_r: float | None = None
+    exit_reason: str | None = None
+    moved_to_be_early: bool = False
+    path_clean: bool = True
+    day_of_week: int = -1
+    note: str = ""
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -187,6 +260,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             for t in trades[:limit]
         ]
 
+    @app.get("/api/webhooks")
+    async def list_webhooks(limit: int = 100, st: AppState = Depends(get_state)) -> list:
+        """Recent TradingView alerts that landed on /webhooks/pine (signals + trades)."""
+        async with st.db.session() as s:
+            rows = await Repository(s).list_webhooks(limit)
+        return [{"ts": r.ts.isoformat(), "matched": r.matched, **r.payload} for r in rows]
+
     @app.post("/api/backtest")
     async def run_backtest(req: BacktestRequest, authorization: str | None = Header(default=None),
                            st: AppState = Depends(get_state)) -> dict:
@@ -229,36 +309,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         st: AppState = Depends(get_state)) -> dict:
         """Journal a manual trade so it feeds the per-condition analytics (auth-gated)."""
         _require_control(st, authorization)
-        from ..domain.enums import (
-            AMDPhase,
-            BreakevenTrigger,
-            ExitReason,
-            Killzone,
-            Side,
-            Symbol,
-        )
-        from ..domain.trades import Trade
-
-        def _enum(enum_cls, value, default):
-            try:
-                return enum_cls(value)
-            except ValueError:
-                return default
-
-        now = datetime.now(UTC)
-        dow = req.day_of_week if req.day_of_week >= 0 else now.weekday()
-        be = BreakevenTrigger.EARLY_PULLBACK if req.moved_to_be_early else BreakevenTrigger.STRUCTURAL_BREAK
-        trade = Trade(
-            symbol=Symbol.NQ, side=_enum(Side, req.side, Side.LONG), entry_ts=now,
-            entry_px=req.entry_px, qty_initial=1, mode=_enum(TradeMode, req.mode, TradeMode.DEMO),
-            exit_ts=now, exit_px=req.exit_px,
-            realized_pnl=req.realized_pnl if req.realized_pnl is not None else round(req.realized_r * 100, 2),
-            realized_r=req.realized_r, day_of_week=dow,
-            killzone=_enum(Killzone, req.killzone, Killzone.NY_AM), quarter_idx=req.quarter_idx,
-            amd_phase=AMDPhase.DISTRIBUTION, path_clean=req.path_clean,
-            moved_to_be_early=req.moved_to_be_early, be_trigger=be,
-            runner_held=not req.moved_to_be_early,
-            exit_reason=_enum(ExitReason, req.exit_reason, ExitReason.TP),
+        trade = _make_trade(
+            side=req.side, realized_r=req.realized_r, mode=req.mode,
+            killzone=req.killzone, quarter_idx=req.quarter_idx, day_of_week=req.day_of_week,
+            path_clean=req.path_clean, moved_to_be_early=req.moved_to_be_early,
+            exit_reason=req.exit_reason, entry_px=req.entry_px, exit_px=req.exit_px,
+            realized_pnl=req.realized_pnl,
         )
         async with st.db.session() as s:
             await Repository(s).add_trade(trade)
@@ -298,11 +354,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         secret = st.settings.webhook_secret
         if secret and not hmac.compare_digest(alert.secret or "", secret):
             raise HTTPException(status_code=403, detail="bad webhook secret")
+        payload = alert.model_dump(exclude={"secret"})
+        trade_logged = False
         async with st.db.session() as s:
-            await Repository(s).log_webhook(datetime.now(UTC),
-                                            alert.model_dump(exclude={"secret"}))
-        await st.hub.broadcast({"type": "pine_alert", "alert": alert.model_dump(exclude={"secret"})})
-        return {"ok": True}
+            repo = Repository(s)
+            await repo.log_webhook(datetime.now(UTC), payload)
+            # A TradingView *strategy* posts kind="trade" on each closed round-trip, so the
+            # per-condition analytics accrue with NO broker API. Webhook trades are ALWAYS
+            # demo — a public webhook URL must never be able to write live-mode data.
+            if alert.kind == "trade" and alert.realized_r is not None:
+                trade = _make_trade(
+                    side=alert.side or alert.bias or "long",
+                    realized_r=alert.realized_r, mode="demo",
+                    killzone=alert.killzone or "ny_am",
+                    quarter_idx=alert.quarter if alert.quarter is not None else -1,
+                    day_of_week=alert.day_of_week, path_clean=alert.path_clean,
+                    moved_to_be_early=alert.moved_to_be_early,
+                    exit_reason=alert.exit_reason or "tp",
+                    entry_px=alert.entry or 0.0, exit_px=alert.exit,
+                )
+                await repo.add_trade(trade)
+                trade_logged = True
+        await st.hub.broadcast({"type": "pine_alert", "alert": payload})
+        return {"ok": True, "trade_logged": trade_logged}
 
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:

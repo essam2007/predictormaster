@@ -73,6 +73,48 @@ def test_pine_webhook(client):
     c, _ = client
     r = c.post("/webhooks/pine", json={"source": "pine", "symbol": "NQ", "bias": "long"})
     assert r.status_code == 200 and r.json()["ok"] is True
+    # a plain signal alert is logged but creates no trade
+    assert r.json()["trade_logged"] is False
+
+
+def test_pine_webhook_trade_feeds_demo_analytics(client):
+    """A TradingView strategy fires kind='trade' webhooks -> demo trades, no broker API."""
+    c, _ = client
+    win = c.post("/webhooks/pine", json={
+        "source": "pine", "kind": "trade", "symbol": "NQ", "side": "long",
+        "realized_r": 2.0, "killzone": "silver_bullet", "moved_to_be_early": False,
+        "exit_reason": "runner_target", "quarter": 1, "day_of_week": 2})
+    assert win.status_code == 200 and win.json()["trade_logged"] is True
+    loss = c.post("/webhooks/pine", json={
+        "source": "pine", "kind": "trade", "side": "short",
+        "realized_r": -1.0, "moved_to_be_early": True, "exit_reason": "be"})
+    assert loss.json()["trade_logged"] is True
+    # webhook trades land under DEMO and split by the breakeven bucket
+    summary = c.get("/api/analytics/summary?mode=demo").json()
+    assert summary["overall"]["n"] == 2
+    be = {b["label"]: b for b in summary["buckets"]["moved_to_be_early"]}
+    assert "be_early" in be and "no_be_early" in be
+
+
+def test_webhooks_feed_lists_recent_alerts(client):
+    c, _ = client
+    c.post("/webhooks/pine", json={"source": "pine", "symbol": "NQ", "bias": "long"})
+    c.post("/webhooks/pine", json={"source": "pine", "kind": "trade", "side": "short",
+                                   "realized_r": 1.5, "exit_reason": "runner_target"})
+    feed = c.get("/api/webhooks").json()
+    assert len(feed) == 2
+    # newest first; trade-kind alert carries its realized_r through the feed
+    assert feed[0]["kind"] == "trade" and feed[0]["realized_r"] == 1.5
+
+
+def test_pine_webhook_trade_never_writes_live(client):
+    """Even if a payload claims mode=live, webhook trades are forced to demo."""
+    c, _ = client
+    c.post("/webhooks/pine", json={
+        "source": "pine", "kind": "trade", "side": "long", "realized_r": 1.0,
+        "mode": "live"})  # 'mode' is ignored by the webhook on purpose
+    assert c.get("/api/analytics/summary?mode=live").json()["overall"]["n"] == 0
+    assert c.get("/api/analytics/summary?mode=demo").json()["overall"]["n"] == 1
 
 
 def test_log_trade_feeds_demo_analytics(client):
