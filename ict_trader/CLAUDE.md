@@ -114,6 +114,29 @@ user clicks Manual Deploy). Local: `python scripts/run_all.py` or `run-deck-mac.
 - Charts = **Lightweight Charts** (free, embeddable; supports our arrows + click-to-mark).
 - UI styling = bespoke dark theme via `theme.css` (zero build deps), not Tailwind/Mantine.
 
+## Useful tooling (MCP servers & skills)
+**MCP servers — already available in Claude Code on the web (no install needed):**
+- **GitHub** (`mcp__github__*`) — PRs, CI logs, reviews; used to manage PR #2.
+- **Bigdata.com** (`mcp__Bigdata_com__*`) — financial/market data, company & market tearsheets,
+  news sentiment, events calendar. Useful for macro/news context around NQ/ES sessions and the
+  8:30 ET news-block filter research.
+- Others are available but off-topic (Notion, Gmail, Google Drive, Zoom). External
+  market-data/broker MCP servers can't be auto-installed here (they need credentials/config);
+  add them in Claude Code settings if/when API access exists.
+
+**Skills useful for this project:**
+- `/code-review`, `/simplify` — review/clean the diff before pushing.
+- `/verify`, `/run` — drive the deck to confirm a change works in the real app.
+- `claude-api` — consult when building the **Phase E** Claude trade-grader (model ids/params).
+- `deep-research` — multi-source research (validating ICT concepts, data-feed options).
+- `session-start-hook`, `update-config` — set up an env-bootstrap hook / settings (persistent
+  `.claude/` change; needs the user's explicit approval).
+
+**Env-bootstrap hook (optional, needs approval):** a `.claude/hooks/session-start.sh` that
+auto-installs the venv (`.[serve,dev]`) + frontend deps so web sessions can run the gate
+instantly. The script is ready (venv create + `pip install -e ".[serve,dev]"` + `npm install`),
+but the safety system blocks adding auto-run hooks unless the user explicitly asks for it.
+
 ## How to continue in a new chat
 1. `cd ict_trader && source .venv/bin/activate`; confirm the gate is green.
 2. Pick the next roadmap item (start with **B remainder**, then C). Keep detectors pure.
