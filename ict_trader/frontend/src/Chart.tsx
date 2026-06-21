@@ -17,15 +17,18 @@ export function CandleChart({ bars, trades, height = 460 }: {
     if (!el) return;
     const chart: IChartApi = createChart(el, {
       height,
-      layout: { background: { type: ColorType.Solid, color: "#0e131b" }, textColor: "#8b97a7" },
-      grid: { vertLines: { color: "#1a2230" }, horzLines: { color: "#1a2230" } },
-      timeScale: { timeVisible: true, secondsVisible: false, borderColor: "#232c3b" },
-      rightPriceScale: { borderColor: "#232c3b" },
+      layout: {
+        background: { type: ColorType.Solid, color: "#ffffff" },
+        textColor: "#6b7280", fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+      },
+      grid: { vertLines: { color: "#f1f2f4" }, horzLines: { color: "#f1f2f4" } },
+      timeScale: { timeVisible: true, secondsVisible: false, borderColor: "#e6e7ea" },
+      rightPriceScale: { borderColor: "#e6e7ea" },
       crosshair: { mode: CrosshairMode.Normal },
     });
     const series = chart.addCandlestickSeries({
-      upColor: "#3fb950", downColor: "#f85149", borderVisible: false,
-      wickUpColor: "#3fb950", wickDownColor: "#f85149",
+      upColor: "#16a34a", downColor: "#dc2626", borderVisible: false,
+      wickUpColor: "#16a34a", wickDownColor: "#dc2626",
     });
     series.setData(bars.map((b) => ({
       time: b.time as UTCTimestamp, open: b.open, high: b.high, low: b.low, close: b.close,
