@@ -40,6 +40,9 @@ move_be_early = input.bool(false, "Move to breakeven early? (the documented flaw
 be_after_r    = input.float(1.0,  "…after this many R in favor", group = "Management")
 secret_in     = input.string("",  "Webhook shared secret", group = "Webhook",
      tooltip = "Paste ICT_TRADER_WEBHOOK_SECRET from your deck (Render env var). Leave blank if unset.")
+emit_bars     = input.bool(true,  "Stream OHLC bars to the deck", group = "Webhook",
+     tooltip = "Fire one webhook per closed bar carrying its OHLC so the deck draws live candles " +
+     "and can run the detectors over each trade's window.")
 show_kz       = input.bool(true,  "Killzone / Silver Bullet shading", group = "Visuals")
 
 tick    = syminfo.mintick
@@ -190,6 +193,17 @@ if just_closed
     if secret_in != ""
         alert(msg, alert.freq_once_per_bar_close)
     entry_px := na
+
+// ---------------- bar feed: one webhook per closed bar (OHLC for the deck's charts) ----------
+// The deck stores these under demo and draws candlesticks + runs detectors over the window.
+if emit_bars and secret_in != ""
+    bar_msg = '{"source":"pine","secret":"' + secret_in + '","symbol":"' + syminfo.ticker +
+         '","timeframe":"' + timeframe.period + '","bars":[{"t":' +
+         str.tostring(math.round(time / 1000)) +
+         ',"o":' + str.tostring(open) + ',"h":' + str.tostring(high) +
+         ',"l":' + str.tostring(low) + ',"c":' + str.tostring(close) +
+         ',"v":' + str.tostring(nz(volume)) + '}]}'
+    alert(bar_msg, alert.freq_once_per_bar_close)
 
 plot(strategy.position_size != 0 and not na(target) ? target : na, "ERL target",
      color = color.teal, style = plot.style_linebr)

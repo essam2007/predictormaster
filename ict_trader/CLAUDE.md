@@ -92,9 +92,10 @@ user clicks Manual Deploy). Local: `python scripts/run_all.py` or `run-deck-mac.
   system, Overview/stat tiles, restyled all views, login screen. Section IA in place.
 - **B — Charts + webhook bars** ✅ shipped (deck). bars table + webhook v2 + `/api/bars` +
   Lightweight Charts candles with long/short arrows + sample-bar seed.
-  - **B remainder (next):** emit a **bar-feed alert** from `pine/qict_strategy.pine` (latest
-    closed bar as JSON) + document it in `TRADINGVIEW.md`, so live candles flow (today only
-    seeded demo bars render). Also: FVG/IFVG boxes + killzone shading overlays on the chart.
+  - **B bar-feed** ✅ shipped. `pine/qict_strategy.pine` fires one webhook per closed bar
+    (`bars:[{t,o,h,l,c,v}]`, "Stream OHLC bars" input, default on); documented in TRADINGVIEW.md.
+    Live candles now flow from TradingView.
+  - **B remainder (next):** FVG/IFVG boxes + killzone shading overlays drawn on the chart.
 - **D — Auto-detection** ✅ shipped. `analytics/trade_analyzer.py` runs the FVG / IFVG / LTF
   trigger / market-structure detectors over a logged trade's bar window + the trade's
   timing/path tags → 6 weighted elements, a 0..1 deterministic score and A–D grade, stored in

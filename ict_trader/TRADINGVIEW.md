@@ -41,6 +41,10 @@ Render dashboard (Environment tab); you'll paste it into the Pine input.
 3. **Configure inputs (gear):**
    - **Correlated symbol (ES)** → `CME_MINI:ES1!`.
    - **Webhook shared secret** → paste your `ICT_TRADER_WEBHOOK_SECRET`.
+   - **Stream OHLC bars to the deck** → leave **ON**. The strategy then fires one webhook per
+     closed bar carrying its OHLC, so the deck's **Charts** tab draws live candlesticks with
+     long/short arrows and the **AI detector** can run over each trade's bar window. (Until
+     this flows, Charts shows seeded sample candles.)
    - **Move to breakeven early?** → leave **OFF** to trade the model correctly (hold the
      runner). Flip it ON later to measure the leak — see the experiment below.
 4. **Backtest for free first.** Open the **Strategy Tester** tab (bottom). You instantly get
