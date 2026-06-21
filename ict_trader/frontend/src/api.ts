@@ -45,6 +45,7 @@ export interface AuthConfig { login_required: boolean; user: string }
 export interface LoginResult { ok: boolean; token: string; user: string }
 export interface Bar { time: number; open: number; high: number; low: number; close: number; volume: number }
 export interface JournalTrade {
+  id?: number;
   entry_ts: string;
   side: string;
   entry_px: number;
@@ -57,6 +58,19 @@ export interface JournalTrade {
   path_clean: boolean;
   moved_to_be_early: boolean;
   exit_reason: string | null;
+  analysis_score?: number | null;
+  analysis_grade?: string | null;
+}
+export interface AnalysisElement { name: string; present: boolean; weight: number; detail: string }
+export interface TradeAnalysis {
+  trade_id: number;
+  score: number;
+  grade: string;
+  summary: string;
+  elements: AnalysisElement[];
+  model: string;
+  llm_grade: string | null;
+  llm_rationale: string | null;
 }
 
 // --- Auth token (single-user cockpit) ----------------------------------------
@@ -105,6 +119,7 @@ export const api = {
   webhooks: (limit = 100) => j<WebhookAlert[]>(`/api/webhooks?limit=${limit}`),
   bars: (symbol = "NQ", timeframe = "5", mode = "demo", limit = 500) =>
     j<Bar[]>(`/api/bars?symbol=${symbol}&timeframe=${timeframe}&mode=${mode}&limit=${limit}`),
+  tradeAnalysis: (id: number) => j<TradeAnalysis>(`/api/trades/${id}/analysis`),
   kill: (reason = "manual") =>
     j<any>(`/api/control/kill?reason=${encodeURIComponent(reason)}`, { method: "POST" }),
   resume: () => j<any>("/api/control/resume", { method: "POST" }),

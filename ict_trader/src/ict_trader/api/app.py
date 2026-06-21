@@ -22,7 +22,9 @@ from pydantic import BaseModel
 
 from ..analytics.calibration import component_lift, score_reliability
 from ..analytics.metrics import equity_curve, summarize
+from ..analytics.trade_analyzer import analyze_trade
 from ..config import Settings, get_settings
+from ..domain.bars import Bar
 from ..domain.enums import (
     AMDPhase,
     BreakevenTrigger,
@@ -30,6 +32,7 @@ from ..domain.enums import (
     Killzone,
     Side,
     Symbol,
+    Timeframe,
     TradeMode,
 )
 from ..domain.trades import Trade
@@ -140,6 +143,37 @@ def _make_trade(
         runner_held=not moved_to_be_early,
         exit_reason=_enum(ExitReason, exit_reason, ExitReason.TP),
     )
+
+
+def _rows_to_bars(rows: list, symbol: str) -> list[Bar]:
+    """Build domain Bars from stored BarRows so the detectors can run over the window."""
+    sym = _enum(Symbol, symbol, Symbol.NQ)
+    out: list[Bar] = []
+    for r in rows:
+        ts = r.ts if r.ts.tzinfo else r.ts.replace(tzinfo=UTC)
+        out.append(Bar(symbol=sym, timeframe=Timeframe.M5, ts_open=ts, open=r.open,
+                       high=r.high, low=r.low, close=r.close, volume=r.volume))
+    return out
+
+
+async def _analyze_and_store(
+    repo: Repository, trade_id: int, *, side: str, entry_ts: datetime, mode: str,
+    killzone: str, path_clean: bool, moved_to_be_early: bool, symbol: str = "NQ",
+) -> None:
+    """Run the detector suite over the trade's bar window and persist the grade.
+
+    Best-effort: any failure (e.g. no bars yet) is swallowed so logging a trade never breaks.
+    """
+    try:
+        rows = await repo.list_bars(mode, symbol, "5", 500)
+        bars = _rows_to_bars(rows, symbol)
+        analysis = analyze_trade(
+            side=side, entry_ts=entry_ts, bars=bars, killzone=killzone,
+            path_clean=path_clean, moved_to_be_early=moved_to_be_early,
+        )
+        await repo.save_trade_analysis(trade_id, mode, analysis.to_dict())
+    except Exception:  # noqa: BLE001 - analysis is advisory, never fatal to logging
+        pass
 
 
 class BacktestRequest(BaseModel):
@@ -332,19 +366,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                           st: AppState = Depends(get_state),
                           _: None = Depends(require_view)) -> list:
         async with st.db.session() as s:
-            trades = await Repository(s).list_trades(TradeMode(mode))
-        return [
-            {
-                "entry_ts": t.entry_ts.isoformat(), "side": t.side.value,
-                "entry_px": t.entry_px, "exit_px": t.exit_px,
-                "realized_r": t.realized_r, "realized_pnl": t.realized_pnl,
-                "killzone": t.killzone.value, "quarter_idx": t.quarter_idx,
-                "day_of_week": t.day_of_week, "path_clean": t.path_clean,
-                "moved_to_be_early": t.moved_to_be_early,
-                "exit_reason": t.exit_reason.value if t.exit_reason else None,
-            }
-            for t in trades[:limit]
-        ]
+            repo = Repository(s)
+            rows = await repo.list_trade_rows(TradeMode(mode))
+            analyses = await repo.analyses_by_trade(TradeMode(mode))
+        out = []
+        for r in rows[:limit]:
+            a = analyses.get(r.id)
+            out.append({
+                "id": r.id,
+                "entry_ts": r.entry_ts.isoformat(), "side": r.side,
+                "entry_px": r.entry_px, "exit_px": r.exit_px,
+                "realized_r": r.realized_r, "realized_pnl": r.realized_pnl,
+                "killzone": r.killzone, "quarter_idx": r.quarter_idx,
+                "day_of_week": r.day_of_week, "path_clean": r.path_clean,
+                "moved_to_be_early": r.moved_to_be_early, "exit_reason": r.exit_reason,
+                "analysis_score": a.score if a else None,
+                "analysis_grade": a.grade if a else None,
+            })
+        return out
+
+    @app.get("/api/trades/{trade_id}/analysis")
+    async def trade_analysis(trade_id: int, st: AppState = Depends(get_state),
+                             _: None = Depends(require_view)) -> dict:
+        """The auto-detected setup elements + grade for one trade (the AI-detector output)."""
+        async with st.db.session() as s:
+            a = await Repository(s).get_trade_analysis(trade_id)
+        if a is None:
+            raise HTTPException(status_code=404, detail="no analysis for this trade")
+        return {"trade_id": a.trade_id, "score": a.score, "grade": a.grade,
+                "summary": a.summary, "elements": a.elements, "model": a.model,
+                "llm_grade": a.llm_grade, "llm_rationale": a.llm_rationale}
 
     @app.get("/api/webhooks")
     async def list_webhooks(limit: int = 100, st: AppState = Depends(get_state),
@@ -417,7 +468,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             realized_pnl=req.realized_pnl,
         )
         async with st.db.session() as s:
-            await Repository(s).add_trade(trade)
+            repo = Repository(s)
+            tid = await repo.add_trade(trade)
+            await _analyze_and_store(
+                repo, tid, side=trade.side.value, entry_ts=trade.entry_ts,
+                mode=trade.mode.value, killzone=trade.killzone.value,
+                path_clean=trade.path_clean, moved_to_be_early=trade.moved_to_be_early,
+                symbol=trade.symbol.value)
         return {"ok": True, "mode": trade.mode.value, "realized_r": trade.realized_r}
 
     @app.post("/api/broker/test")
@@ -480,7 +537,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     exit_reason=alert.exit_reason or "tp",
                     entry_px=alert.entry or 0.0, exit_px=alert.exit,
                 )
-                await repo.add_trade(trade)
+                tid = await repo.add_trade(trade)
+                await _analyze_and_store(
+                    repo, tid, side=trade.side.value, entry_ts=trade.entry_ts, mode="demo",
+                    killzone=trade.killzone.value, path_clean=trade.path_clean,
+                    moved_to_be_early=trade.moved_to_be_early, symbol=trade.symbol.value)
                 trade_logged = True
         await st.hub.broadcast({"type": "pine_alert", "alert": payload})
         return {"ok": True, "trade_logged": trade_logged, "bars_added": bars_added}

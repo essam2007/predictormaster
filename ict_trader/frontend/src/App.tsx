@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   api, getToken, setToken as storeToken, clearToken, setUnauthorizedHandler,
   type AuthConfig, type Status, type Summary, type EquityPoint, type WebhookAlert,
-  type Bar, type JournalTrade,
+  type Bar, type JournalTrade, type TradeAnalysis,
 } from "./api";
 import { CandleChart } from "./Chart";
 
@@ -404,9 +404,19 @@ function Sparkline({ points }: { points: number[] }) {
   );
 }
 
+const gradeTone = (g?: string | null) =>
+  g === "A" || g === "B" ? "green" : g === "C" ? "amber" : g ? "red" : "";
+
 function JournalView({ mode }: { mode: string }) {
   const [rows, setRows] = useState<JournalTrade[]>([]);
+  const [open, setOpen] = useState<number | null>(null);
+  const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null);
   usePoll(() => { api.trades(mode).then(setRows).catch(() => setRows([])); }, 15000, [mode]);
+  const toggle = (id?: number) => {
+    if (!id || open === id) { setOpen(null); setAnalysis(null); return; }
+    setOpen(id); setAnalysis(null);
+    api.tradeAnalysis(id).then(setAnalysis).catch(() => setAnalysis(null));
+  };
   return (
     <div className="card pad-lg">
       <div className="card-head">
@@ -418,22 +428,45 @@ function JournalView({ mode }: { mode: string }) {
         ? <div className="empty">no {mode} trades yet.</div>
         : <div className="scroll"><table className="table">
             <thead><tr><th>entry</th><th>side</th><th className="num">R</th><th>killzone</th>
-              <th>BE early?</th><th>exit</th></tr></thead>
+              <th>BE early?</th><th>exit</th><th>grade</th></tr></thead>
             <tbody>
               {rows.map((t, i) => (
-                <tr key={i}>
-                  <td className="muted">{t.entry_ts}</td><td>{t.side}</td>
-                  <td className={"num " + (t.realized_r >= 0 ? "pos" : "neg")}>{t.realized_r}</td>
-                  <td className="muted">{t.killzone}</td>
-                  <td>{t.moved_to_be_early ? <span className="badge amber">⚠ BE</span> : "—"}</td>
-                  <td className="muted">{t.exit_reason}</td>
-                </tr>
+                <Fragment key={t.id ?? i}>
+                  <tr style={{ cursor: t.id ? "pointer" : "default" }} onClick={() => toggle(t.id)}>
+                    <td className="muted">{t.entry_ts}</td><td>{t.side}</td>
+                    <td className={"num " + (t.realized_r >= 0 ? "pos" : "neg")}>{t.realized_r}</td>
+                    <td className="muted">{t.killzone}</td>
+                    <td>{t.moved_to_be_early ? <span className="badge amber">⚠ BE</span> : "—"}</td>
+                    <td className="muted">{t.exit_reason}</td>
+                    <td>{t.analysis_grade
+                      ? <span className={"badge " + gradeTone(t.analysis_grade)}>
+                          {t.analysis_grade} · {t.analysis_score}</span>
+                      : <span className="faint">—</span>}</td>
+                  </tr>
+                  {open === t.id && (
+                    <tr><td colSpan={7} style={{ background: "var(--surface-2)" }}>
+                      {analysis
+                        ? <div style={{ padding: "4px 2px" }}>
+                            <p className="lead" style={{ fontSize: 13, marginTop: 0 }}>{analysis.summary}</p>
+                            <div className="row">
+                              {analysis.elements.map((e) => (
+                                <span key={e.name} className={"badge " + (e.present ? "green" : "")}>
+                                  {e.present ? "✓" : "·"} {e.name}{e.detail ? ` (${e.detail})` : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        : <span className="faint">loading analysis…</span>}
+                    </td></tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table></div>}
       <p className="lead" style={{ marginTop: 12, marginBottom: 0, fontSize: 13 }}>
-        Auto-detected setup elements (FVG / IFVG / SMT / PSP / killzone / path) and a Claude
-        grade attach to each trade in Phases D–E.
+        Each trade is auto-graded by the ICT detector suite (HTF FVG, IFVG trigger, structure,
+        killzone, path) — click a row for the element breakdown. A Claude narrative grade layers
+        on top in Phase E.
       </p>
     </div>
   );

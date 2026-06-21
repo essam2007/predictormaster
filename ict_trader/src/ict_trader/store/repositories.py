@@ -19,7 +19,15 @@ from ..domain.enums import (
 )
 from ..domain.signals import SetupSnapshot
 from ..domain.trades import ManagementEvent, Trade
-from .models import BarRow, EquityRow, OrderRow, SetupRow, TradeRow, WebhookAlertRow
+from .models import (
+    BarRow,
+    EquityRow,
+    OrderRow,
+    SetupRow,
+    TradeAnalysisRow,
+    TradeRow,
+    WebhookAlertRow,
+)
 
 
 def bar_epoch(dt: datetime) -> int:
@@ -92,9 +100,13 @@ class Repository:
         self.s.add_all([trade_to_row(t) for t in trades])
         await self.s.commit()
 
-    async def add_trade(self, trade: Trade) -> None:
-        self.s.add(trade_to_row(trade))
+    async def add_trade(self, trade: Trade) -> int:
+        row = trade_to_row(trade)
+        self.s.add(row)
+        await self.s.flush()  # assigns the autoincrement PK without expiring on commit
+        trade_id = row.id
         await self.s.commit()
+        return trade_id
 
     async def list_trades(self, mode: TradeMode | None = None) -> list[Trade]:
         stmt = select(TradeRow)
@@ -102,6 +114,35 @@ class Repository:
             stmt = stmt.where(TradeRow.mode == mode.value)
         rows = (await self.s.execute(stmt.order_by(TradeRow.entry_ts))).scalars().all()
         return [row_to_trade(r) for r in rows]
+
+    async def list_trade_rows(self, mode: TradeMode | None = None) -> list[TradeRow]:
+        """Like list_trades but returns ORM rows (with their ids) for joining analysis."""
+        stmt = select(TradeRow)
+        if mode is not None:
+            stmt = stmt.where(TradeRow.mode == mode.value)
+        return list((await self.s.execute(stmt.order_by(TradeRow.entry_ts))).scalars().all())
+
+    async def save_trade_analysis(self, trade_id: int, mode: str, analysis: dict) -> None:
+        self.s.add(TradeAnalysisRow(
+            trade_id=trade_id, mode=mode, score=analysis["score"], grade=analysis["grade"],
+            summary=analysis["summary"], elements=analysis["elements"], model=analysis["model"],
+            created_at=datetime.now(UTC),
+        ))
+        await self.s.commit()
+
+    async def get_trade_analysis(self, trade_id: int) -> TradeAnalysisRow | None:
+        stmt = (select(TradeAnalysisRow).where(TradeAnalysisRow.trade_id == trade_id)
+                .order_by(TradeAnalysisRow.id.desc()).limit(1))
+        return (await self.s.execute(stmt)).scalars().first()
+
+    async def analyses_by_trade(self, mode: TradeMode) -> dict[int, TradeAnalysisRow]:
+        """Latest analysis per trade for a mode, keyed by trade_id (for the journal)."""
+        stmt = (select(TradeAnalysisRow).where(TradeAnalysisRow.mode == mode.value)
+                .order_by(TradeAnalysisRow.id))
+        out: dict[int, TradeAnalysisRow] = {}
+        for r in (await self.s.execute(stmt)).scalars().all():
+            out[r.trade_id] = r  # later row (higher id) wins
+        return out
 
     async def list_setups(self, mode: TradeMode | None = None) -> list[SetupRow]:
         stmt = select(SetupRow)

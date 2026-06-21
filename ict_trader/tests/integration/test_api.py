@@ -219,6 +219,32 @@ def test_login_503_when_no_password_configured(tmp_path):
         assert c.post("/api/login", json={"user": "admin", "password": "x"}).status_code == 503
 
 
+def test_logged_trade_gets_auto_analysis(client):
+    """Logging a trade auto-runs the detector suite over the bar window and stores a grade."""
+    c, _ = client
+    # seed demo bars so the detector window is populated
+    bars = [{"t": 1715780100 + i * 300, "o": 18000 + i, "h": 18010 + i,
+             "l": 17995 + i, "c": 18005 + i, "v": 500} for i in range(8)]
+    assert c.post("/webhooks/pine", json={"source": "pine", "symbol": "NQ",
+                  "timeframe": "5", "bars": bars}).json()["bars_added"] == 8
+    # log a demo trade (auth-gated)
+    h = {"Authorization": "Bearer secret"}
+    assert c.post("/api/trades", headers=h, json={
+        "side": "long", "realized_r": 2.0, "killzone": "ny_am", "path_clean": True,
+    }).status_code == 200
+    # it shows in the journal with an auto grade
+    trades = c.get("/api/trades?mode=demo").json()
+    assert len(trades) == 1 and trades[0]["analysis_grade"] in {"A", "B", "C", "D"}
+    tid = trades[0]["id"]
+    # the detail endpoint returns the 6-element breakdown; killzone+path are present
+    a = c.get(f"/api/trades/{tid}/analysis").json()
+    assert a["score"] >= 0.25 and len(a["elements"]) == 6
+    assert any(e["name"] == "Killzone timing" and e["present"] for e in a["elements"])
+    assert any(e["name"] == "Clean path (LRLR)" and e["present"] for e in a["elements"])
+    # unknown trade -> 404
+    assert c.get("/api/trades/99999/analysis").status_code == 404
+
+
 def test_broker_test_requires_auth_and_reports_unconfigured(client, monkeypatch):
     c, _ = client
     # no auth -> 401

@@ -95,10 +95,14 @@ user clicks Manual Deploy). Local: `python scripts/run_all.py` or `run-deck-mac.
   - **B remainder (next):** emit a **bar-feed alert** from `pine/qict_strategy.pine` (latest
     closed bar as JSON) + document it in `TRADINGVIEW.md`, so live candles flow (today only
     seeded demo bars render). Also: FVG/IFVG boxes + killzone shading overlays on the chart.
+- **D — Auto-detection** ✅ shipped. `analytics/trade_analyzer.py` runs the FVG / IFVG / LTF
+  trigger / market-structure detectors over a logged trade's bar window + the trade's
+  timing/path tags → 6 weighted elements, a 0..1 deterministic score and A–D grade, stored in
+  `trade_analysis`. Auto-runs when any trade is logged (webhook or /api/trades); surfaced via
+  `GET /api/trades/{id}/analysis`, in `/api/trades` (grade column), and expandable in the
+  Journal. Seed grades the demo trades.
 - **C — Click-to-log tool**: click a chart point → choose entry → `POST /api/log-entry`
   creates a demo trade; trade↔chart linkage; the entry feeds the dataset.
-- **D — Auto-detection**: run the 9 detectors over a logged trade's bar window → tag & log
-  which elements were present + a deterministic setup score (`trade_analysis`). No API key.
 - **E — Claude grading**: `llm/grader.py` (Anthropic SDK) → narrative grade (A–F) + rationale
   per trade; needs `ANTHROPIC_API_KEY`, no-ops without. Consult the `claude-api` skill for the
   current model id/params at build time.

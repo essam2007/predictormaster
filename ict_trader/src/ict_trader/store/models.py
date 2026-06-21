@@ -106,6 +106,28 @@ class TradeRow(Base):
     events: Mapped[list] = mapped_column(JSON, default=list)
 
 
+class TradeAnalysisRow(Base):
+    """Auto-detected setup elements + grade for a logged trade (the 'AI detector' output).
+
+    ``elements`` is the full detector breakdown (jsonb); the deterministic ``score``/``grade``
+    come from the ICT detectors run over the trade's bar window. The ``llm_*`` columns hold an
+    optional Claude narrative grade (Phase E) layered on top."""
+
+    __tablename__ = "trade_analysis"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trade_id: Mapped[int] = mapped_column(Integer, index=True)
+    mode: Mapped[str] = mapped_column(String(16), index=True, default="demo")
+    score: Mapped[float] = mapped_column(Float, default=0.0)
+    grade: Mapped[str] = mapped_column(String(2), default="D")
+    summary: Mapped[str] = mapped_column(String(1000), default="")
+    elements: Mapped[list] = mapped_column(JSON, default=list)
+    model: Mapped[str] = mapped_column(String(32), default="detectors-v1")
+    llm_grade: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    llm_rationale: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class OrderRow(Base):
     __tablename__ = "orders"
 

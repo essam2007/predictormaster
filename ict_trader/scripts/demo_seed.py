@@ -14,8 +14,10 @@ import asyncio
 import random
 from datetime import UTC, datetime, timedelta
 
+from ict_trader.analytics.trade_analyzer import analyze_trade
 from ict_trader.clock import ET
 from ict_trader.config import get_settings
+from ict_trader.domain.bars import Bar
 from ict_trader.domain.enums import (
     AMDPhase,
     BreakevenTrigger,
@@ -23,6 +25,7 @@ from ict_trader.domain.enums import (
     Killzone,
     Side,
     Symbol,
+    Timeframe,
     TradeMode,
 )
 from ict_trader.domain.trades import Trade
@@ -125,13 +128,24 @@ async def _run() -> None:
     trades = _sample_trades()
     bars = _sample_bars()
     demo_trades = _sample_demo_trades(bars)
+    domain_bars = [
+        Bar(symbol=Symbol.NQ, timeframe=Timeframe.M5, ts_open=b["ts"], open=b["open"],
+            high=b["high"], low=b["low"], close=b["close"], volume=b["volume"])
+        for b in bars
+    ]
     async with db.session() as sess:
         repo = Repository(sess)
         await repo.add_trades(trades)
         await repo.add_bars("demo", "NQ", "5", bars)
-        await repo.add_trades(demo_trades)
+        # log demo trades individually so we get ids, then auto-grade each (the AI detector)
+        for t in demo_trades:
+            tid = await repo.add_trade(t)
+            analysis = analyze_trade(
+                side=t.side, entry_ts=t.entry_ts, bars=domain_bars, killzone=t.killzone,
+                path_clean=t.path_clean, moved_to_be_early=t.moved_to_be_early)
+            await repo.save_trade_analysis(tid, "demo", analysis.to_dict())
     await db.dispose()
-    print(f"seeded {len(trades)} backtest + {len(demo_trades)} demo SAMPLE trades and "
+    print(f"seeded {len(trades)} backtest + {len(demo_trades)} graded demo SAMPLE trades and "
           f"{len(bars)} demo bars into {s.db_url}. Open the deck (Charts / Analytics tabs).")
 
 
