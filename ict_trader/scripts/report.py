@@ -15,7 +15,7 @@ import asyncio
 import html
 
 from ict_trader.analytics.calibration import component_lift, score_reliability
-from ict_trader.analytics.metrics import equity_curve, summarize
+from ict_trader.analytics.metrics import equity_curve, r_distribution, summarize
 from ict_trader.config import get_settings
 from ict_trader.domain.enums import TradeMode
 from ict_trader.domain.signals import SetupSnapshot
@@ -64,6 +64,19 @@ def render_html(trades: list[Trade], setups: list[SetupSnapshot], mode: str) -> 
 
     # equity curve (inline SVG)
     a("<h2>Equity (cumulative R)</h2><div class='card'>" + _equity_svg(eq) + "</div>")
+
+    # R distribution
+    rd = r_distribution(trades)
+    if rd:
+        peak = max(r["count"] for r in rd) or 1
+        a("<h2>R distribution</h2><div class='card'><table>"
+          "<tr><th>R bucket</th><th>count</th><th></th></tr>")
+        for row in rd:
+            bar = "█" * max(1, round(20 * row["count"] / peak))
+            cls = _cls(row["bucket"])
+            a(f"<tr><td class='{cls}'>{row['bucket']:+.1f}</td><td>{row['count']}</td>"
+              f"<td style='text-align:left' class='{cls}'>{bar}</td></tr>")
+        a("</table></div>")
 
     # per-bucket
     a("<h2>Per-bucket hit-rate &amp; avg R</h2>")

@@ -90,3 +90,17 @@ def equity_curve(trades: list[Trade]) -> list[dict]:
         out.append({"ts": (t.exit_ts or t.entry_ts).isoformat(),
                     "cum_pnl": round(cum_pnl, 2), "cum_r": round(cum_r, 3)})
     return out
+
+
+def r_distribution(trades: list[Trade], bin_width: float = 0.5) -> list[dict]:
+    """Histogram of realized R: count of trades per ``bin_width`` bucket, ascending."""
+    import math
+    from collections import Counter
+
+    counts: Counter[float] = Counter()
+    for t in trades:
+        if t.is_open:
+            continue
+        bucket = round(math.floor(t.realized_r / bin_width) * bin_width, 2)
+        counts[bucket] += 1
+    return [{"bucket": b, "count": counts[b]} for b in sorted(counts)]

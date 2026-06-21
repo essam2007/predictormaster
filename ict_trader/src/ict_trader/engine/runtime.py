@@ -78,7 +78,8 @@ class LiveEngine:
             trade = self._broker.force_close(self._open, bar)
         else:
             trade = self._broker.on_bar(self._open, bar)
-        if self._open.dead:  # invalidated before entry
+        if self._open.dead:  # invalidated before entry filled -> release the reserved slot
+            self.risk.release_open()
             self._open = None
             return
         if trade is not None and self._open.closed:

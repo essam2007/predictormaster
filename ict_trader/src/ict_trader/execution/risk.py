@@ -68,6 +68,10 @@ class RiskEngine:
     def on_open(self) -> None:
         self.open_positions += 1
 
+    def release_open(self) -> None:
+        """Release a reserved slot for an intent that never actually filled (no position)."""
+        self.open_positions = max(0, self.open_positions - 1)
+
     def on_close(self, realized_pnl: float) -> None:
         self.open_positions = max(0, self.open_positions - 1)
         if realized_pnl < 0:

@@ -31,6 +31,7 @@ def test_render_html_has_sections_and_bucket():
     assert "Per-bucket" in out
     assert "moved_to_be_early" in out and "be_early" in out
     assert "Equity" in out and "<svg" in out
+    assert "R distribution" in out
     assert "Trade journal (3)" in out
 
 
