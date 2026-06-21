@@ -28,3 +28,6 @@ frontend/node_modules/
 # Python only — no Node needed. Rebuild + recommit it after any UI change.
 !frontend/dist/
 !frontend/dist/**
+
+# generated setup charts
+charts/
