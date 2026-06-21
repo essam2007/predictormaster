@@ -106,8 +106,9 @@ user clicks Manual Deploy). Local: `python scripts/run_all.py` or `run-deck-mac.
 - **E — Claude grading**: `llm/grader.py` (Anthropic SDK) → narrative grade (A–F) + rationale
   per trade; needs `ANTHROPIC_API_KEY`, no-ops without. Consult the `claude-api` skill for the
   current model id/params at build time.
-- **F — Dataset**: flatten every trade to a labeled feature row; Dataset section + JSONL/CSV
-  export (`scripts/export_dataset.py`) for model training.
+- **F — Dataset** ✅ shipped. `/api/dataset` (preview) + `/api/dataset/export?format=jsonl|csv`
+  flatten every trade to a labeled feature row (tags + detected-element booleans + outcome
+  `realized_r`/`win`); Dataset section previews the table and downloads JSONL/CSV.
 - **G — Strategies + live-exec monitor**: strategy config CRUD; pipeline-step status
   (feed→detectors→aggregator→risk→execution) over the WS hub, shown live.
 - **Final**: keep this CLAUDE.md current; arm the improvement `/loop`.

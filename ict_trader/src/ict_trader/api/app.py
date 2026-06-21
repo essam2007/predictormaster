@@ -8,7 +8,10 @@ these; nothing here can place an order (the live engine owns execution).
 from __future__ import annotations
 
 import asyncio
+import csv
 import hmac
+import io
+import json
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -17,6 +20,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -174,6 +178,46 @@ async def _analyze_and_store(
         await repo.save_trade_analysis(trade_id, mode, analysis.to_dict())
     except Exception:  # noqa: BLE001 - analysis is advisory, never fatal to logging
         pass
+
+
+# Flattened training-dataset schema: per-trade features (tags + detected elements) + outcome.
+_ELEMENT_COLS = {
+    "HTF FVG delivery": "el_htf_fvg",
+    "IFVG / LTF trigger": "el_ifvg",
+    "Structure shift (BOS)": "el_bos",
+    "Displacement leg": "el_displacement",
+    "Killzone timing": "el_killzone",
+    "Clean path (LRLR)": "el_clean_path",
+}
+DATASET_COLUMNS = [
+    "trade_id", "entry_ts", "side", "killzone", "quarter_idx", "day_of_week",
+    "path_clean", "moved_to_be_early", "exit_reason", "setup_score",
+    "analysis_score", "analysis_grade",
+    *_ELEMENT_COLS.values(),
+    "realized_r", "realized_pnl", "win",
+]
+
+
+def _dataset_rows(rows: list, analyses: dict) -> list[dict[str, Any]]:
+    """Flatten trades + their analysis into one labeled feature row each (for model training)."""
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        a = analyses.get(r.id)
+        rec: dict[str, Any] = {
+            "trade_id": r.id, "entry_ts": r.entry_ts.isoformat(), "side": r.side,
+            "killzone": r.killzone, "quarter_idx": r.quarter_idx, "day_of_week": r.day_of_week,
+            "path_clean": int(r.path_clean), "moved_to_be_early": int(r.moved_to_be_early),
+            "exit_reason": r.exit_reason, "setup_score": r.setup_score,
+            "analysis_score": a.score if a else None,
+            "analysis_grade": a.grade if a else None,
+            "realized_r": r.realized_r, "realized_pnl": r.realized_pnl,
+            "win": int(r.realized_r > 0),
+        }
+        present = {e["name"]: e["present"] for e in (a.elements if a else [])}
+        for name, col in _ELEMENT_COLS.items():
+            rec[col] = int(present[name]) if name in present else None
+        out.append(rec)
+    return out
 
 
 class BacktestRequest(BaseModel):
@@ -396,6 +440,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"trade_id": a.trade_id, "score": a.score, "grade": a.grade,
                 "summary": a.summary, "elements": a.elements, "model": a.model,
                 "llm_grade": a.llm_grade, "llm_rationale": a.llm_rationale}
+
+    @app.get("/api/dataset")
+    async def dataset(mode: str = "demo", st: AppState = Depends(get_state),
+                      _: None = Depends(require_view)) -> dict:
+        """Preview the training dataset: every trade flattened to a labeled feature row."""
+        async with st.db.session() as s:
+            repo = Repository(s)
+            rows = await repo.list_trade_rows(TradeMode(mode))
+            analyses = await repo.analyses_by_trade(TradeMode(mode))
+        recs = _dataset_rows(rows, analyses)
+        return {"n": len(recs), "columns": DATASET_COLUMNS, "rows": recs[:100]}
+
+    @app.get("/api/dataset/export")
+    async def dataset_export(mode: str = "demo", format: str = "jsonl",
+                             st: AppState = Depends(get_state),
+                             _: None = Depends(require_view)) -> Response:
+        """Download the full labeled dataset for model training (jsonl or csv)."""
+        async with st.db.session() as s:
+            repo = Repository(s)
+            rows = await repo.list_trade_rows(TradeMode(mode))
+            analyses = await repo.analyses_by_trade(TradeMode(mode))
+        recs = _dataset_rows(rows, analyses)
+        if format == "csv":
+            buf = io.StringIO()
+            writer = csv.DictWriter(buf, fieldnames=DATASET_COLUMNS)
+            writer.writeheader()
+            writer.writerows(recs)
+            content, media, ext = buf.getvalue(), "text/csv", "csv"
+        else:
+            content = "\n".join(json.dumps(rec) for rec in recs)
+            media, ext = "application/x-ndjson", "jsonl"
+        return Response(content=content, media_type=media, headers={
+            "Content-Disposition": f"attachment; filename=ict_trades_{mode}.{ext}"})
 
     @app.get("/api/webhooks")
     async def list_webhooks(limit: int = 100, st: AppState = Depends(get_state),

@@ -61,6 +61,7 @@ export interface JournalTrade {
   analysis_score?: number | null;
   analysis_grade?: string | null;
 }
+export interface DatasetPreview { n: number; columns: string[]; rows: Record<string, unknown>[] }
 export interface AnalysisElement { name: string; present: boolean; weight: number; detail: string }
 export interface TradeAnalysis {
   trade_id: number;
@@ -120,6 +121,15 @@ export const api = {
   bars: (symbol = "NQ", timeframe = "5", mode = "demo", limit = 500) =>
     j<Bar[]>(`/api/bars?symbol=${symbol}&timeframe=${timeframe}&mode=${mode}&limit=${limit}`),
   tradeAnalysis: (id: number) => j<TradeAnalysis>(`/api/trades/${id}/analysis`),
+  dataset: (mode = "demo") => j<DatasetPreview>(`/api/dataset?mode=${mode}`),
+  exportDataset: async (mode = "demo", format = "jsonl"): Promise<string> => {
+    const headers = new Headers();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const r = await fetch(`/api/dataset/export?mode=${mode}&format=${format}`, { headers });
+    if (r.status === 401) { onUnauthorized?.(); throw new Error("401"); }
+    if (!r.ok) throw new Error(`export -> ${r.status}`);
+    return r.text();
+  },
   kill: (reason = "manual") =>
     j<any>(`/api/control/kill?reason=${encodeURIComponent(reason)}`, { method: "POST" }),
   resume: () => j<any>("/api/control/resume", { method: "POST" }),

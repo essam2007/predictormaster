@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import {
   api, getToken, setToken as storeToken, clearToken, setUnauthorizedHandler,
   type AuthConfig, type Status, type Summary, type EquityPoint, type WebhookAlert,
-  type Bar, type JournalTrade, type TradeAnalysis,
+  type Bar, type JournalTrade, type TradeAnalysis, type DatasetPreview,
 } from "./api";
 import { CandleChart } from "./Chart";
 
@@ -94,8 +94,7 @@ export function App() {
         {section === "Trades" && <JournalView mode={mode} />}
         {section === "Log Trade" && <LogTradeView authed={authed} />}
         {section === "Analytics" && <BucketsView mode={mode} />}
-        {section === "Dataset" && <ComingSoon title="Training Dataset" tag="DATA" phase="Phase F"
-          body="Every logged trade flattened into a labeled feature row (the 9 component booleans, killzone/quarter/day, path-clean, breakeven flag, setup + grade scores, outcome R) — browsable here and exportable as JSONL/CSV for model training." />}
+        {section === "Dataset" && <DatasetView mode={mode} />}
         {section === "Strategies" && <ComingSoon title="Strategies" tag="DEPLOY" phase="Phase G"
           body="Create and manage strategy configs/parameters, version them, and deploy to demo with each pipeline step (feed → detectors → aggregator → risk → execution) monitored live." />}
         {section === "Control" && <ControlView authed={authed} />}
@@ -528,6 +527,60 @@ function LogTradeView({ authed }: { authed: boolean }) {
     </div>
   );
 }
+
+function DatasetView({ mode }: { mode: string }) {
+  const [data, setData] = useState<DatasetPreview | null>(null);
+  const [msg, setMsg] = useState("");
+  usePoll(() => { api.dataset(mode).then(setData).catch(() => setData(null)); }, 20000, [mode]);
+  const download = (format: "jsonl" | "csv") => {
+    setMsg("");
+    api.exportDataset(mode, format)
+      .then((text) => {
+        const blob = new Blob([text], { type: format === "csv" ? "text/csv" : "application/x-ndjson" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = `ict_trades_${mode}.${format}`; a.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch((e) => setMsg("export error: " + String(e)));
+  };
+  const cols = data?.columns ?? [];
+  const preview = (data?.rows ?? []).slice(0, 12);
+  return (
+    <div className="card pad-lg">
+      <div className="card-head">
+        <div><span className="mono-label">{mode} · model training data</span>
+          <h2 className="h-section" style={{ marginTop: 6 }}>Dataset</h2></div>
+        <div className="row">
+          <span className="badge">{data?.n ?? 0} rows</span>
+          <span className="badge">{cols.length} features</span>
+        </div>
+      </div>
+      <p className="lead" style={{ fontSize: 13.5 }}>
+        Every logged trade flattened to one labeled row — tags + the auto-detected setup
+        elements + outcome (<code>realized_r</code>, <code>win</code>) — ready to train a model
+        on what actually carries edge. Export as JSONL or CSV.
+      </p>
+      <div className="row" style={{ marginBottom: 14 }}>
+        <button className="btn primary" onClick={() => download("jsonl")}>Download JSONL</button>
+        <button className="btn" onClick={() => download("csv")}>Download CSV</button>
+        {msg && <span className="neg" style={{ fontSize: 13 }}>{msg}</span>}
+      </div>
+      {preview.length === 0
+        ? <div className="empty">no {mode} rows yet — log trades (they auto-grade) to build the set.</div>
+        : <div className="scroll"><table className="table">
+            <thead><tr>{cols.map((c) => <th key={c}>{c}</th>)}</tr></thead>
+            <tbody>
+              {preview.map((r, i) => (
+                <tr key={i}>{cols.map((c) => <td key={c} className="muted">{fmtCell(r[c])}</td>)}</tr>
+              ))}
+            </tbody>
+          </table></div>}
+    </div>
+  );
+}
+
+const fmtCell = (v: unknown) => v === null || v === undefined ? "·" : String(v);
 
 function ControlView({ authed }: { authed: boolean }) {
   const [msg, setMsg] = useState("");

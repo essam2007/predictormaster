@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -243,6 +244,31 @@ def test_logged_trade_gets_auto_analysis(client):
     assert any(e["name"] == "Clean path (LRLR)" and e["present"] for e in a["elements"])
     # unknown trade -> 404
     assert c.get("/api/trades/99999/analysis").status_code == 404
+
+
+def test_dataset_preview_and_export(client):
+    """Trades flatten into a labeled training dataset, downloadable as jsonl/csv."""
+    c, _ = client
+    h = {"Authorization": "Bearer secret"}
+    c.post("/api/trades", headers=h, json={"side": "long", "realized_r": 2.0, "killzone": "ny_am"})
+    c.post("/api/trades", headers=h, json={
+        "side": "short", "realized_r": -1.0, "moved_to_be_early": True})
+    preview = c.get("/api/dataset?mode=demo").json()
+    assert preview["n"] == 2
+    for col in ("win", "realized_r", "el_killzone", "analysis_grade", "moved_to_be_early"):
+        assert col in preview["columns"]
+    # jsonl: one parseable object per trade, with the outcome label
+    jl = c.get("/api/dataset/export?mode=demo&format=jsonl")
+    assert jl.status_code == 200
+    lines = [ln for ln in jl.text.splitlines() if ln.strip()]
+    assert len(lines) == 2
+    rec = json.loads(lines[0])
+    assert "win" in rec and "realized_r" in rec
+    # csv: header + 2 data rows
+    csv_resp = c.get("/api/dataset/export?mode=demo&format=csv")
+    assert csv_resp.status_code == 200
+    csv_lines = csv_resp.text.splitlines()
+    assert csv_lines[0].startswith("trade_id,") and len(csv_lines) == 3
 
 
 def test_broker_test_requires_auth_and_reports_unconfigured(client, monkeypatch):
