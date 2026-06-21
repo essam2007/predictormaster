@@ -118,10 +118,11 @@ def _make_trade(
     entry_px: float = 0.0,
     exit_px: float | None = None,
     realized_pnl: float | None = None,
+    entry_ts: datetime | None = None,
 ) -> Trade:
-    """Build a realized Trade from journaled/webhook fields (shared by both sources)."""
-    now = datetime.now(UTC)
-    dow = day_of_week if day_of_week >= 0 else now.weekday()
+    """Build a realized Trade from journaled/webhook/click fields (shared by all sources)."""
+    ts = entry_ts or datetime.now(UTC)
+    dow = day_of_week if day_of_week >= 0 else ts.weekday()
     be = (
         BreakevenTrigger.EARLY_PULLBACK
         if moved_to_be_early
@@ -130,11 +131,11 @@ def _make_trade(
     return Trade(
         symbol=Symbol.NQ,
         side=_enum(Side, side, Side.LONG),
-        entry_ts=now,
+        entry_ts=ts,
         entry_px=entry_px,
         qty_initial=1,
         mode=_enum(TradeMode, mode, TradeMode.DEMO),
-        exit_ts=now,
+        exit_ts=ts,
         exit_px=exit_px,
         realized_pnl=realized_pnl if realized_pnl is not None else round(realized_r * 100, 2),
         realized_r=realized_r,
@@ -148,6 +149,15 @@ def _make_trade(
         runner_held=not moved_to_be_early,
         exit_reason=_enum(ExitReason, exit_reason, ExitReason.TP),
     )
+
+
+def _parse_ts(value: str) -> datetime:
+    """Parse a chart timestamp (unix seconds or ISO string) to a tz-aware UTC datetime."""
+    try:
+        return datetime.fromtimestamp(float(value), tz=UTC)
+    except (TypeError, ValueError):
+        ts = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return ts if ts.tzinfo else ts.replace(tzinfo=UTC)
 
 
 def _rows_to_bars(rows: list, symbol: str) -> list[Bar]:
@@ -266,6 +276,24 @@ class LogTradeRequest(BaseModel):
     exit_px: float | None = None
     note: str = ""
     mode: str = "demo"
+
+
+class LogEntryRequest(BaseModel):
+    """A trade marked by clicking the chart — the entry time/price come from the click, so the
+    detector window is the real pre-entry window. Always logged demo."""
+
+    entry_ts: str  # unix-seconds or ISO string captured from the chart click
+    entry_px: float = 0.0
+    side: str = "long"
+    realized_r: float = 0.0
+    exit_px: float | None = None
+    killzone: str = "ny_am"
+    quarter_idx: int = -1
+    path_clean: bool = True
+    moved_to_be_early: bool = False
+    exit_reason: str = "manual"
+    note: str = ""
+    symbol: str = "NQ"
 
 
 class PineAlert(BaseModel):
@@ -568,6 +596,31 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 path_clean=trade.path_clean, moved_to_be_early=trade.moved_to_be_early,
                 realized_r=trade.realized_r, symbol=trade.symbol.value)
         return {"ok": True, "mode": trade.mode.value, "realized_r": trade.realized_r}
+
+    @app.post("/api/log-entry")
+    async def log_entry(req: LogEntryRequest, authorization: str | None = Header(default=None),
+                        st: AppState = Depends(get_state)) -> dict:
+        """Click-to-log: turn a chart point into a graded demo trade fed into the dataset.
+
+        The entry timestamp comes from the click, so the detector window is the actual
+        pre-entry window. Always demo (the chart tool never writes live data)."""
+        _require_control(st, authorization)
+        ets = _parse_ts(req.entry_ts)
+        trade = _make_trade(
+            side=req.side, realized_r=req.realized_r, mode="demo", killzone=req.killzone,
+            quarter_idx=req.quarter_idx, day_of_week=-1, path_clean=req.path_clean,
+            moved_to_be_early=req.moved_to_be_early, exit_reason=req.exit_reason,
+            entry_px=req.entry_px, exit_px=req.exit_px, entry_ts=ets,
+        )
+        async with st.db.session() as s:
+            repo = Repository(s)
+            tid = await repo.add_trade(trade)
+            await _analyze_and_store(
+                repo, tid, side=trade.side.value, entry_ts=trade.entry_ts, mode="demo",
+                killzone=trade.killzone.value, path_clean=trade.path_clean,
+                moved_to_be_early=trade.moved_to_be_early, realized_r=trade.realized_r,
+                symbol=req.symbol)
+        return {"ok": True, "trade_id": tid, "entry_ts": trade.entry_ts.isoformat()}
 
     @app.post("/api/broker/test")
     async def broker_test(authorization: str | None = Header(default=None),

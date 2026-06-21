@@ -5,12 +5,15 @@ import {
 } from "lightweight-charts";
 import type { Bar, JournalTrade } from "./api";
 
-// A TradingView-style candlestick chart (Lightweight Charts) with long/short arrows drawn
-// at each trade's entry. This is the wrapped-chart surface; Phase C adds click-to-mark-entry.
-export function CandleChart({ bars, trades, height = 460 }: {
+// A TradingView-style candlestick chart (Lightweight Charts) with long/short arrows drawn at
+// each trade's entry. Clicking a candle calls onPick(time, price) — the click-to-log tool.
+export function CandleChart({ bars, trades, height = 460, onPick }: {
   bars: Bar[]; trades: JournalTrade[]; height?: number;
+  onPick?: (time: number, price: number) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const pickRef = useRef(onPick);
+  pickRef.current = onPick;
 
   useEffect(() => {
     const el = ref.current;
@@ -57,11 +60,19 @@ export function CandleChart({ bars, trades, height = 460 }: {
     }
     chart.timeScale().fitContent();
 
+    // click-to-log: report the clicked bar time + price at that y-coordinate
+    const onClick = (param: { time?: unknown; point?: { y: number } }) => {
+      if (!pickRef.current || param.time == null || !param.point) return;
+      const price = series.coordinateToPrice(param.point.y);
+      if (price != null) pickRef.current(Number(param.time), Number(price));
+    };
+    chart.subscribeClick(onClick);
+
     const ro = new ResizeObserver((entries) => {
       for (const e of entries) chart.applyOptions({ width: e.contentRect.width });
     });
     ro.observe(el);
-    return () => { ro.disconnect(); chart.remove(); };
+    return () => { chart.unsubscribeClick(onClick); ro.disconnect(); chart.remove(); };
   }, [bars, trades, height]);
 
   return <div ref={ref} style={{ width: "100%" }} />;

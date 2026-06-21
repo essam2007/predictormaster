@@ -86,7 +86,7 @@ export function App() {
 
       <main className="page">
         {section === "Overview" && <OverviewView mode={mode} onGo={setSection} />}
-        {section === "Charts" && <ChartsView mode={mode} />}
+        {section === "Charts" && <ChartsView mode={mode} authed={authed} />}
         {section === "Backtesting" && <ComingSoon title="Backtesting" tag="ENGINE" phase="Phase B"
           body="Run/replay over a date range with parameter controls (including the move-to-breakeven-early toggle), rendered on the same charts and analytics, with run-to-run comparison." />}
         {section === "Signals" && <SignalsView />}
@@ -253,14 +253,31 @@ function OverviewView({ mode, onGo }: { mode: string; onGo: (s: Section) => void
   );
 }
 
-function ChartsView({ mode }: { mode: string }) {
+function ChartsView({ mode, authed }: { mode: string; authed: boolean }) {
   const [bars, setBars] = useState<Bar[]>([]);
   const [trades, setTrades] = useState<JournalTrade[]>([]);
   const [err, setErr] = useState("");
+  const [tick, setTick] = useState(0);  // bump to force a data refresh after logging
+  const [pick, setPick] = useState<{ time: number; price: number } | null>(null);
+  const [side, setSide] = useState("long");
+  const [r, setR] = useState("1.0");
+  const [beEarly, setBeEarly] = useState(false);
+  const [msg, setMsg] = useState("");
   usePoll(() => {
     api.bars("NQ", "5", mode, 500).then(setBars).catch((e) => setErr(String(e)));
     api.trades(mode).then(setTrades).catch(() => setTrades([]));
-  }, 15000, [mode]);
+  }, 15000, [mode, tick]);
+
+  const submitPick = () => {
+    if (!pick) return;
+    api.logEntry({
+      entry_ts: String(pick.time), entry_px: pick.price, side, realized_r: Number(r),
+      moved_to_be_early: beEarly, killzone: "ny_am", exit_reason: "manual", symbol: "NQ",
+    })
+      .then(() => { setMsg("logged ✓"); setPick(null); setTick((t) => t + 1); })
+      .catch((e) => setMsg("error: " + String(e)));
+  };
+
   return (
     <div className="card pad-lg">
       <div className="terminal-head">
@@ -274,15 +291,45 @@ function ChartsView({ mode }: { mode: string }) {
         <span className="badge red"><span className="dot red" /> short</span>
         <span className="badge">{bars.length} bars</span>
         <span className="badge">{trades.length} trades</span>
+        <span className="faint" style={{ fontSize: 12 }}>
+          {authed ? "click a candle to log an entry →" : "sign in to log entries by clicking"}
+        </span>
       </div>
       {err && <p className="neg">{err}</p>}
       {bars.length === 0
         ? <div className="empty">no bars yet for <b>{mode}</b> — they arrive on the TradingView
             bar-feed webhook (or seed sample data). See TRADINGVIEW.md.</div>
-        : <CandleChart bars={bars} trades={trades} />}
+        : <CandleChart bars={bars} trades={trades}
+            onPick={authed ? (time, price) => { setMsg(""); setPick({ time, price }); } : undefined} />}
+
+      {pick && (
+        <div className="card" style={{ marginTop: 12, background: "var(--surface-2)" }}>
+          <div className="spread">
+            <span className="mono-label">log entry @
+              {" " + new Date(pick.time * 1000).toISOString().slice(0, 16).replace("T", " ")} ·
+              {" " + pick.price.toFixed(2)}</span>
+            <button className="btn ghost sm" onClick={() => setPick(null)}>✕</button>
+          </div>
+          <div className="row" style={{ marginTop: 8 }}>
+            <select className="input" style={{ width: "auto" }} value={side}
+              onChange={(e) => setSide(e.target.value)}>
+              <option value="long">long</option><option value="short">short</option>
+            </select>
+            <label className="field-inline">R&nbsp;
+              <input className="input" style={{ width: 90, display: "inline-block" }} type="number"
+                step="0.1" value={r} onChange={(e) => setR(e.target.value)} /></label>
+            <label className="check"><input type="checkbox" checked={beEarly}
+              onChange={(e) => setBeEarly(e.target.checked)} /> moved to BE early ⚠</label>
+            <button className="btn primary sm" onClick={submitPick}>Log entry</button>
+          </div>
+        </div>
+      )}
+      {msg && <p className="mono" style={{ fontSize: 12 }}>{msg}</p>}
+
       <p className="lead" style={{ marginTop: 14, marginBottom: 0, fontSize: 13 }}>
-        Candles are fed by the Pine bar-feed alert; arrows mark where each trade went long/short.
-        FVG/IFVG boxes, killzone shading and click-to-mark-entry arrive in Phase C.
+        Candles are fed by the Pine bar-feed; arrows mark where each trade went long/short.
+        Click a candle to mark an entry — it's graded by the detectors (and Claude, if enabled)
+        at that exact bar and added to the training dataset under <b>demo</b>.
       </p>
     </div>
   );

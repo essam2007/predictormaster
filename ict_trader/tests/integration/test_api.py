@@ -271,6 +271,29 @@ def test_dataset_preview_and_export(client):
     assert csv_lines[0].startswith("trade_id,") and len(csv_lines) == 3
 
 
+def test_log_entry_click_uses_clicked_window_and_grades(client):
+    """The click-to-log tool logs a demo trade at the clicked bar time and grades it."""
+    c, _ = client
+    # seed bars whose timestamps the click will reference
+    base = 1715780100
+    bars = [{"t": base + i * 300, "o": 18000 + i, "h": 18010 + i,
+             "l": 17995 + i, "c": 18005 + i, "v": 500} for i in range(8)]
+    c.post("/webhooks/pine", json={"source": "pine", "symbol": "NQ", "timeframe": "5", "bars": bars})
+    click_ts = base + 6 * 300  # click the 7th candle
+    h = {"Authorization": "Bearer secret"}
+    # unauth -> 401
+    assert c.post("/api/log-entry", json={"entry_ts": str(click_ts)}).status_code == 401
+    r = c.post("/api/log-entry", headers=h, json={
+        "entry_ts": str(click_ts), "entry_px": 18030.0, "side": "long", "realized_r": 1.5,
+        "moved_to_be_early": False})
+    assert r.status_code == 200 and r.json()["ok"] is True
+    # it lands under demo at the clicked time (not "now") with an auto grade
+    trades = c.get("/api/trades?mode=demo").json()
+    assert len(trades) == 1
+    assert trades[0]["entry_ts"].startswith("2024-05-15")  # the clicked bar's date, not today
+    assert trades[0]["analysis_grade"] in {"A", "B", "C", "D"}
+
+
 def test_broker_test_requires_auth_and_reports_unconfigured(client, monkeypatch):
     c, _ = client
     # no auth -> 401

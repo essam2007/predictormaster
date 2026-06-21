@@ -102,8 +102,10 @@ user clicks Manual Deploy). Local: `python scripts/run_all.py` or `run-deck-mac.
   `trade_analysis`. Auto-runs when any trade is logged (webhook or /api/trades); surfaced via
   `GET /api/trades/{id}/analysis`, in `/api/trades` (grade column), and expandable in the
   Journal. Seed grades the demo trades.
-- **C — Click-to-log tool**: click a chart point → choose entry → `POST /api/log-entry`
-  creates a demo trade; trade↔chart linkage; the entry feeds the dataset.
+- **C — Click-to-log tool** ✅ shipped. Clicking a candle (Chart.tsx `subscribeClick` →
+  time+price) opens an inline form (side / R / BE-early) → `POST /api/log-entry` logs a demo
+  trade **at the clicked bar time** (so the detector window is the real pre-entry window),
+  auto-grades it, and refreshes. Feeds the dataset.
 - **E — Claude grading** ✅ shipped. `llm/grader.py` (lazy `anthropic` SDK, cost-efficient model
   via `ICT_TRADER_GRADER_MODEL`) grades each logged trade's SETUP quality (A–F + ≤2-sentence
   rationale, penalizing breakeven-early). Optional + no-op without `ANTHROPIC_API_KEY`; runs
