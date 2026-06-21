@@ -4,8 +4,8 @@ import {
   type AuthConfig, type Status, type Summary, type EquityPoint, type WebhookAlert,
 } from "./api";
 
-// Re-run `fn` on mount, when `deps` change, and every `ms` so live paper activity shows
-// without a manual reload.
+// Re-run `fn` on mount, when `deps` change, and every `ms` so live activity shows without a
+// manual reload.
 function usePoll(fn: () => void, ms = 15000, deps: unknown[] = []) {
   const saved = useRef(fn);
   saved.current = fn;
@@ -17,88 +17,133 @@ function usePoll(fn: () => void, ms = 15000, deps: unknown[] = []) {
   }, [ms, ...deps]);
 }
 
-// Minimal research-deck shell. Tabs map to the plan's pages; this scaffold wires the data
-// flow (status, per-bucket analytics, equity, trade journal). Candlestick overlays use
-// lightweight-charts (added in package.json) on the Live Monitor tab — left as the next
-// build step since it needs the live bar feed.
+// ---- Navigation / sections (the research-desk information architecture) -----------------
+// "soon" sections are scaffolded now so the structure/roadmap is visible; they fill in over
+// Phases B–G (charts, backtesting, dataset, strategies). See CLAUDE.md.
+type Section =
+  | "Overview" | "Charts" | "Backtesting"
+  | "Signals" | "Equity"
+  | "Trades" | "Log Trade" | "Analytics" | "Dataset"
+  | "Strategies" | "Control";
 
-const TABS = ["Status", "Signals", "Per-Bucket Analytics", "Equity", "Trade Journal", "Log Trade", "Control"] as const;
-type Tab = (typeof TABS)[number];
-
-const card: React.CSSProperties = {
-  background: "#161b22", border: "1px solid #30363d", borderRadius: 8,
-  padding: 16, margin: 8,
-};
+interface NavItem { key: Section; ico: string; soon?: boolean }
+const NAV: { group: string; items: NavItem[] }[] = [
+  { group: "Desk", items: [
+    { key: "Overview", ico: "◧" },
+    { key: "Charts", ico: "📈", soon: true },
+    { key: "Backtesting", ico: "⏮", soon: true },
+  ] },
+  { group: "Monitor", items: [
+    { key: "Signals", ico: "⚡" },
+    { key: "Equity", ico: "∿" },
+  ] },
+  { group: "Research", items: [
+    { key: "Trades", ico: "≣" },
+    { key: "Log Trade", ico: "✎" },
+    { key: "Analytics", ico: "▦" },
+    { key: "Dataset", ico: "⛁", soon: true },
+  ] },
+  { group: "System", items: [
+    { key: "Strategies", ico: "⚙", soon: true },
+    { key: "Control", ico: "⏻" },
+  ] },
+];
 
 const MODES = ["backtest", "demo", "live"] as const;
+const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
 export function App() {
-  const [tab, setTab] = useState<Tab>("Status");
-  // backtest = seeded/replay results; demo = live paper trades from your account; live = real.
-  const [mode, setMode] = useState<string>("backtest");
+  const [section, setSection] = useState<Section>("Overview");
+  // backtest = seeded/replay results; demo = live paper / webhook trades; live = real money.
+  const [mode, setMode] = useState<string>("demo");
   const [cfg, setCfg] = useState<AuthConfig | null>(null);
   const [authed, setAuthed] = useState<boolean>(!!getToken());
   const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
-    // A 401 anywhere (expired/cleared token) drops us back to the login screen.
     setUnauthorizedHandler(() => { clearToken(); setAuthed(false); });
-    api.authConfig()
-      .then(setCfg)
-      .catch(() => setCfg({ login_required: false, user: "admin" }));
+    api.authConfig().then(setCfg).catch(() => setCfg({ login_required: false, user: "admin" }));
   }, []);
 
   const onLoggedIn = (token: string) => { storeToken(token); setAuthed(true); setShowLogin(false); };
   const logout = () => { clearToken(); setAuthed(false); };
 
-  // When the host requires login, the whole deck is gated until the user signs in.
-  if (cfg === null) return <div style={{ ...card, maxWidth: 420, margin: "80px auto" }}>loading…</div>;
+  if (cfg === null) return <div className="login-wrap"><div className="empty">loading…</div></div>;
   if ((cfg.login_required && !authed) || showLogin) {
     return <LoginView user={cfg.user} onLoggedIn={onLoggedIn}
       onCancel={cfg.login_required ? undefined : () => setShowLogin(false)} />;
   }
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ fontSize: 20 }}>ICT Trader — Research Deck</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 13 }}>
-          <label>
-            data:{" "}
-            <select value={mode} onChange={(e) => setMode(e.target.value)}
-              style={{ background: "#21262d", color: "#fff", border: "1px solid #30363d", padding: 4 }}>
-              {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </label>
-          {authed
-            ? <button onClick={logout}
-                style={{ background: "#21262d", color: "#fff", border: "1px solid #30363d",
-                         padding: "5px 10px", borderRadius: 6, cursor: "pointer" }}>
-                Logout
-              </button>
-            : <button onClick={() => setShowLogin(true)}
-                style={{ background: "#1f6feb", color: "#fff", border: "none",
-                         padding: "5px 10px", borderRadius: 6, cursor: "pointer" }}>
-                Login
-              </button>}
+    <div className="shell">
+      <aside className="rail">
+        <div className="brand">
+          <div className="logo">Q</div>
+          <div>
+            <div className="title">ICT Trader</div>
+            <div className="subtitle">Quant Research Desk</div>
+          </div>
+        </div>
+        {NAV.map((g) => (
+          <div key={g.group}>
+            <div className="nav-group">{g.group}</div>
+            {g.items.map((it) => (
+              <div key={it.key}
+                className={"nav-item" + (section === it.key ? " active" : "")}
+                onClick={() => setSection(it.key)}>
+                <span className="ico">{it.ico}</span>
+                <span>{it.key}</span>
+                {it.soon && <span className="soon">soon</span>}
+              </div>
+            ))}
+          </div>
+        ))}
+      </aside>
+
+      <div className="main">
+        <header className="topbar">
+          <div>
+            <h2>{section}</h2>
+            <div className="crumb">ICT + Quarterly-Theory · NQ / ES</div>
+          </div>
+          <div className="topbar-right">
+            <label className="field-inline">data&nbsp;
+              <select className="input" style={{ width: "auto", display: "inline-block" }}
+                value={mode} onChange={(e) => setMode(e.target.value)}>
+                {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </label>
+            {authed
+              ? <button className="btn ghost" onClick={logout}>Logout</button>
+              : <button className="btn primary" onClick={() => setShowLogin(true)}>Login</button>}
+          </div>
+        </header>
+        <div className="content">
+          {section === "Overview" && <OverviewView mode={mode} />}
+          {section === "Charts" && <ComingSoon
+            title="Charts / Monitor"
+            phase="Phase B"
+            body="TradingView-style candlestick charts (Lightweight Charts) with the algo's long/short arrows, FVG/IFVG boxes, killzone shading and entry/stop/target lines — fed by OHLC bars carried on the TradingView webhook. The click-to-mark-entry tool (Phase C) lives here." />}
+          {section === "Backtesting" && <ComingSoon
+            title="Backtesting"
+            phase="Phase B"
+            body="Run/replay over a date range with parameter controls (including the move-to-breakeven-early toggle), rendered on the same charts and analytics, with run-to-run comparison." />}
+          {section === "Signals" && <SignalsView />}
+          {section === "Equity" && <EquityView mode={mode} />}
+          {section === "Trades" && <JournalView mode={mode} />}
+          {section === "Log Trade" && <LogTradeView authed={authed} />}
+          {section === "Analytics" && <BucketsView mode={mode} />}
+          {section === "Dataset" && <ComingSoon
+            title="Training Dataset"
+            phase="Phase F"
+            body="Every logged trade flattened into a labeled feature row (the 9 component booleans, killzone/quarter/day, path-clean, breakeven flag, setup + grade scores, outcome R) — browsable here and exportable as JSONL/CSV for model training." />}
+          {section === "Strategies" && <ComingSoon
+            title="Strategies"
+            phase="Phase G"
+            body="Create and manage strategy configs/parameters, version them, and deploy to demo with each pipeline step (feed → detectors → aggregator → risk → execution) monitored live." />}
+          {section === "Control" && <ControlView authed={authed} />}
         </div>
       </div>
-      <nav style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-        {TABS.map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            style={{ background: tab === t ? "#1f6feb" : "#21262d", color: "#fff",
-                     border: "none", padding: "6px 12px", borderRadius: 6, cursor: "pointer" }}>
-            {t}
-          </button>
-        ))}
-      </nav>
-      {tab === "Status" && <StatusView />}
-      {tab === "Signals" && <SignalsView />}
-      {tab === "Per-Bucket Analytics" && <BucketsView mode={mode} />}
-      {tab === "Equity" && <EquityView mode={mode} />}
-      {tab === "Trade Journal" && <JournalView mode={mode} />}
-      {tab === "Log Trade" && <LogTradeView authed={authed} />}
-      {tab === "Control" && <ControlView authed={authed} />}
     </div>
   );
 }
@@ -119,60 +164,105 @@ function LoginView({ user, onLoggedIn, onCancel }: {
       .finally(() => setBusy(false));
   };
   return (
-    <div style={{ maxWidth: 380, margin: "80px auto" }}>
-      <div style={card}>
-        <h1 style={{ fontSize: 20, marginTop: 0 }}>ICT Trader</h1>
-        <p style={{ fontSize: 13, opacity: 0.8 }}>Sign in to your private strategy dashboard.</p>
+    <div className="login-wrap">
+      <div className="card login-card">
+        <div className="logo-big">Q</div>
+        <h3 style={{ fontSize: 18 }}>ICT Trader — Quant Desk</h3>
+        <p className="hint">Sign in to your private strategy dashboard.</p>
         <form onSubmit={submit}>
-          <label style={{ fontSize: 13 }}>username
-            <input value={u} onChange={(e) => setU(e.target.value)} autoFocus style={inp} /></label>
-          <label style={{ fontSize: 13, display: "block", marginTop: 8 }}>password
-            <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} style={inp} /></label>
-          {err && <p style={{ color: "#f85149", fontSize: 13 }}>{err}</p>}
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button type="submit" disabled={busy}
-              style={{ background: "#1f6feb", color: "#fff", border: "none",
-                       padding: "8px 16px", borderRadius: 6, cursor: "pointer" }}>
-              {busy ? "…" : "Sign in"}
-            </button>
-            {onCancel && <button type="button" onClick={onCancel}
-              style={{ background: "#21262d", color: "#fff", border: "1px solid #30363d",
-                       padding: "8px 16px", borderRadius: 6, cursor: "pointer" }}>
-              Cancel
-            </button>}
+          <div className="field"><label>username</label>
+            <input className="input" value={u} onChange={(e) => setU(e.target.value)} autoFocus /></div>
+          <div className="field" style={{ marginTop: 10 }}><label>password</label>
+            <input className="input" type="password" value={pw}
+              onChange={(e) => setPw(e.target.value)} /></div>
+          {err && <p className="neg" style={{ fontSize: 13 }}>{err}</p>}
+          <div className="row" style={{ marginTop: 14 }}>
+            <button className="btn primary" type="submit" disabled={busy}>{busy ? "…" : "Sign in"}</button>
+            {onCancel && <button className="btn ghost" type="button" onClick={onCancel}>Cancel</button>}
           </div>
         </form>
-        <p style={{ fontSize: 12, opacity: 0.6, marginBottom: 0 }}>
+        <p className="faint" style={{ fontSize: 12, marginBottom: 0 }}>
           Your password is the value you set in <code>ICT_TRADER_DASHBOARD_PASSWORD</code>
-          (or the control token if unset). Nothing is sent anywhere but your own deck.
+          (or the control token if unset). Nothing leaves your own deck.
         </p>
       </div>
     </div>
   );
 }
 
-function StatusView() {
-  const [s, setS] = useState<Status | null>(null);
-  const [err, setErr] = useState("");
-  usePoll(() => { api.status().then(setS).catch((e) => setErr(String(e))); });
-  if (err) return <div style={card}>API not reachable: {err}</div>;
-  if (!s) return <div style={card}>loading…</div>;
+function ComingSoon({ title, phase, body }: { title: string; phase: string; body: string }) {
   return (
-    <div style={card}>
-      <h2>Engine</h2>
-      <p>Mode: <b style={{ color: s.is_live ? "#f85149" : "#3fb950" }}>{s.mode}</b></p>
-      <p>In-process engine (Tradovate API): {s.engine_running
-        ? <b style={{ color: "#3fb950" }}>running</b>
-        : <span style={{ opacity: 0.7 }}>off (needs Tradovate API creds — not available on demo)</span>}</p>
-      <p style={{ fontSize: 13, opacity: 0.8 }}>
-        On a demo-only setup, data flows in via the <b>TradingView webhook</b> instead — see the
-        <b> Signals</b> tab. Closed strategy trades land under the <b>demo</b> selector.
-      </p>
-      <p>Kill switch: {s.kill_switch.active ? `ACTIVE (${s.kill_switch.reason})` : "off"}</p>
-      <p>Daily loss: {s.risk.daily_loss_used} / {s.risk.daily_loss_limit}
-         {s.risk.halted && " — HALTED"}</p>
-      <p>Open positions: {s.risk.open_positions}</p>
+    <div className="card">
+      <div className="spread">
+        <h3 style={{ margin: 0 }}>{title}</h3>
+        <span className="badge blue">{phase}</span>
+      </div>
+      <p className="hint" style={{ marginBottom: 0 }}>{body}</p>
     </div>
+  );
+}
+
+function OverviewView({ mode }: { mode: string }) {
+  const [s, setS] = useState<Status | null>(null);
+  const [sum, setSum] = useState<Summary | null>(null);
+  const [eq, setEq] = useState<EquityPoint[]>([]);
+  const [err, setErr] = useState("");
+  usePoll(() => {
+    api.status().then(setS).catch((e) => setErr(String(e)));
+    api.summary(mode).then(setSum).catch(() => setSum(null));
+    api.equity(mode).then(setEq).catch(() => setEq([]));
+  }, 15000, [mode]);
+
+  if (err) return <div className="card empty">API not reachable: {err}</div>;
+  const o = sum?.overall;
+  const last = eq[eq.length - 1];
+  return (
+    <>
+      <div className="grid cols-4">
+        <div className="card stat">
+          <span className="label">Mode</span>
+          <span className={"value " + (s?.is_live ? "neg" : "pos")}>{s?.mode ?? "…"}</span>
+          <span className="sub">{s?.is_live ? "LIVE — real money" : "paper / research"}</span>
+        </div>
+        <div className="card stat">
+          <span className="label">Trades ({mode})</span>
+          <span className="value">{o?.n ?? 0}</span>
+          <span className="sub">hit-rate {o ? pct(o.hit_rate) : "—"}</span>
+        </div>
+        <div className="card stat">
+          <span className="label">Expectancy</span>
+          <span className={"value " + (o && o.expectancy_r >= 0 ? "pos" : o ? "neg" : "")}>
+            {o ? `${o.expectancy_r.toFixed(2)}R` : "—"}</span>
+          <span className="sub">PF {o?.profit_factor ?? "∞"}</span>
+        </div>
+        <div className="card stat">
+          <span className="label">Cumulative PnL</span>
+          <span className={"value " + ((last?.cum_pnl ?? 0) >= 0 ? "pos" : "neg")}>
+            ${last?.cum_pnl ?? 0}</span>
+          <span className="sub">{eq.length} closed · {last?.cum_r ?? 0}R</span>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>Engine & data flow</h3>
+        <div className="row" style={{ marginBottom: 10 }}>
+          <span className={"badge " + (s?.engine_running ? "green" : "")}>
+            <span className={"dot" + (s?.engine_running ? " green" : "")} />
+            in-process engine {s?.engine_running ? "running" : "off"}
+          </span>
+          <span className={"badge " + (s?.kill_switch.active ? "red" : "green")}>
+            kill switch {s?.kill_switch.active ? `ACTIVE (${s.kill_switch.reason})` : "off"}
+          </span>
+          {s?.risk.halted && <span className="badge red">risk halted</span>}
+        </div>
+        <p className="hint" style={{ marginBottom: 0 }}>
+          On a demo-only setup the Tradovate API engine stays off — data flows in via the
+          <b> TradingView webhook</b> (see <b>Signals</b>). Closed strategy trades land under the
+          <b> demo</b> selector and feed the analytics. Daily loss {s?.risk.daily_loss_used ?? 0} /
+          {" "}{s?.risk.daily_loss_limit ?? 0} · open positions {s?.risk.open_positions ?? 0}.
+        </p>
+      </div>
+    </>
   );
 }
 
@@ -181,109 +271,161 @@ function SignalsView() {
   const [err, setErr] = useState("");
   usePoll(() => { api.webhooks(100).then(setRows).catch((e) => setErr(String(e))); }, 10000);
   return (
-    <div style={card}>
-      <h2>TradingView signals → webhook ({rows.length})</h2>
-      <p style={{ fontSize: 13, opacity: 0.8 }}>
+    <div className="card">
+      <div className="spread">
+        <h3 style={{ margin: 0 }}>TradingView signals → webhook</h3>
+        <span className="badge">{rows.length} alerts</span>
+      </div>
+      <p className="hint">
         Alerts arriving at <code>/webhooks/pine</code> from the Pine indicator/strategy. A
-        <b> trade</b> row (kind=trade) is also logged as a demo trade and feeds the analytics;
-        a <b>signal</b> row is just a setup notification.
+        <b> trade</b> row is also logged as a demo trade and feeds the analytics; a
+        <b> signal</b> row is just a setup notification.
       </p>
-      {err && <p style={{ color: "#f85149" }}>{err}</p>}
-      {rows.length === 0 && <p style={{ opacity: 0.7 }}>
-        no alerts yet — add a TradingView alert on the ICT companion/strategy with this deck's
-        webhook URL (see TRADINGVIEW.md).</p>}
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead><tr><th align="left">time</th><th>kind</th><th>side</th><th>R</th>
-          <th>killzone</th><th>BE early?</th><th>exit</th></tr></thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i}>
-              <td>{r.ts}</td>
-              <td align="center">{r.kind === "trade"
-                ? <b style={{ color: "#1f6feb" }}>trade</b> : (r.kind ?? "signal")}</td>
-              <td align="center">{r.side ?? r.bias ?? "—"}</td>
-              <td align="center" style={{ color: (r.realized_r ?? 0) >= 0 ? "#3fb950" : "#f85149" }}>
-                {r.realized_r ?? "—"}</td>
-              <td align="center">{r.killzone ?? "—"}</td>
-              <td align="center">{r.moved_to_be_early ? "⚠️" : "—"}</td>
-              <td align="center">{r.exit_reason ?? "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {err && <p className="neg">{err}</p>}
+      {rows.length === 0
+        ? <div className="empty">no alerts yet — add a TradingView alert on the ICT
+            companion/strategy pointing at this deck's webhook URL (see TRADINGVIEW.md).</div>
+        : <div className="scroll"><table className="table">
+            <thead><tr><th>time</th><th>kind</th><th>side</th><th className="num">R</th>
+              <th>killzone</th><th>BE early?</th><th>exit</th></tr></thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  <td className="muted">{r.ts}</td>
+                  <td>{r.kind === "trade"
+                    ? <span className="badge blue">trade</span>
+                    : <span className="faint">{r.kind ?? "signal"}</span>}</td>
+                  <td>{r.side ?? r.bias ?? "—"}</td>
+                  <td className={"num " + ((r.realized_r ?? 0) >= 0 ? "pos" : "neg")}>
+                    {r.realized_r ?? "—"}</td>
+                  <td className="muted">{r.killzone ?? "—"}</td>
+                  <td>{r.moved_to_be_early ? <span className="badge amber">⚠ BE</span> : "—"}</td>
+                  <td className="muted">{r.exit_reason ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>}
     </div>
   );
 }
 
 function BucketsView({ mode }: { mode: string }) {
   const [sum, setSum] = useState<Summary | null>(null);
-  usePoll(() => { api.summary(mode).then(setSum).catch(() => {}); }, 15000, [mode]);
-  if (!sum) return <div style={card}>no {mode} data yet — seed/backtest or run the engine…</div>;
+  usePoll(() => { api.summary(mode).then(setSum).catch(() => setSum(null)); }, 15000, [mode]);
+  if (!sum || sum.overall.n === 0)
+    return <div className="card empty">no {mode} data yet — seed/backtest or feed the webhook…</div>;
+  const o = sum.overall;
   return (
-    <div>
-      <div style={card}>
-        <h2>Overall</h2>
-        <p>n={sum.overall.n} · hit-rate={pct(sum.overall.hit_rate)} ·
-           avg-R={sum.overall.avg_r} · PF={sum.overall.profit_factor ?? "∞"} ·
-           PnL=${sum.overall.total_pnl}</p>
+    <>
+      <div className="card">
+        <h3>Overall · {mode}</h3>
+        <div className="row">
+          <span className="badge">n {o.n}</span>
+          <span className="badge">hit-rate {pct(o.hit_rate)}</span>
+          <span className={"badge " + (o.avg_r >= 0 ? "green" : "red")}>avg {o.avg_r}R</span>
+          <span className={"badge " + (o.expectancy_r >= 0 ? "green" : "red")}>exp {o.expectancy_r}R</span>
+          <span className="badge">PF {o.profit_factor ?? "∞"}</span>
+          <span className={"badge " + (o.total_pnl >= 0 ? "green" : "red")}>${o.total_pnl}</span>
+        </div>
       </div>
       {Object.entries(sum.buckets).map(([dim, rows]) => (
-        <div style={card} key={dim}>
-          <h3>{dim}</h3>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr><th align="left">bucket</th><th>n</th><th>hit-rate</th>
-              <th>avg-R</th><th>PnL</th></tr></thead>
+        <div className="card" key={dim}>
+          <h3>{dim.replace(/_/g, " ")}</h3>
+          <table className="table">
+            <thead><tr><th>bucket</th><th className="num">n</th><th className="num">hit-rate</th>
+              <th className="num">avg-R</th><th className="num">PnL</th></tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.label}>
-                  <td>{r.label}</td><td align="center">{r.n}</td>
-                  <td align="center">{pct(r.hit_rate)}</td>
-                  <td align="center" style={{ color: r.avg_r >= 0 ? "#3fb950" : "#f85149" }}>{r.avg_r}</td>
-                  <td align="center">${r.total_pnl}</td>
+                  <td>{r.label}</td>
+                  <td className="num">{r.n}</td>
+                  <td className="num">{pct(r.hit_rate)}</td>
+                  <td className={"num " + (r.avg_r >= 0 ? "pos" : "neg")}>{r.avg_r}</td>
+                  <td className="num">${r.total_pnl}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ))}
-    </div>
+    </>
   );
 }
 
 function EquityView({ mode }: { mode: string }) {
   const [eq, setEq] = useState<EquityPoint[]>([]);
-  usePoll(() => { api.equity(mode).then(setEq).catch(() => {}); }, 15000, [mode]);
+  usePoll(() => { api.equity(mode).then(setEq).catch(() => setEq([])); }, 15000, [mode]);
   const last = eq[eq.length - 1];
   return (
-    <div style={card}>
-      <h2>Equity</h2>
-      <p>{eq.length} closed trades · cumulative R={last?.cum_r ?? 0} · PnL=${last?.cum_pnl ?? 0}</p>
-      {/* A lightweight-charts line series renders here once the feed is wired. */}
-      <pre style={{ overflow: "auto", maxHeight: 300 }}>{JSON.stringify(eq.slice(-20), null, 2)}</pre>
+    <div className="card">
+      <div className="spread">
+        <h3 style={{ margin: 0 }}>Equity · {mode}</h3>
+        <div className="row">
+          <span className="badge">{eq.length} closed</span>
+          <span className={"badge " + ((last?.cum_r ?? 0) >= 0 ? "green" : "red")}>{last?.cum_r ?? 0}R</span>
+          <span className={"badge " + ((last?.cum_pnl ?? 0) >= 0 ? "green" : "red")}>${last?.cum_pnl ?? 0}</span>
+        </div>
+      </div>
+      <Sparkline points={eq.map((e) => e.cum_pnl)} />
+      <p className="hint" style={{ marginBottom: 0 }}>
+        A full candlestick equity/price chart (Lightweight Charts) arrives in Phase B.
+      </p>
     </div>
+  );
+}
+
+// Minimal inline SVG sparkline so Equity has a real visual now (no chart dep needed yet).
+function Sparkline({ points }: { points: number[] }) {
+  if (points.length < 2) return <div className="empty">not enough closed trades to plot.</div>;
+  const w = 900, h = 160, pad = 6;
+  const min = Math.min(...points, 0), max = Math.max(...points, 0);
+  const span = max - min || 1;
+  const x = (i: number) => pad + (i / (points.length - 1)) * (w - 2 * pad);
+  const y = (v: number) => h - pad - ((v - min) / span) * (h - 2 * pad);
+  const d = points.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const up = points[points.length - 1] >= 0;
+  const color = up ? "#3fb950" : "#f85149";
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height: 160, display: "block" }}>
+      <line x1={pad} y1={y(0)} x2={w - pad} y2={y(0)} stroke="#2d3850" strokeDasharray="4 4" />
+      <path d={`${d} L${x(points.length - 1)},${y(min)} L${x(0)},${y(min)} Z`}
+        fill={color} opacity={0.08} />
+      <path d={d} fill="none" stroke={color} strokeWidth={1.8} />
+    </svg>
   );
 }
 
 function JournalView({ mode }: { mode: string }) {
   const [rows, setRows] = useState<any[]>([]);
-  usePoll(() => { api.trades(mode).then(setRows).catch(() => {}); }, 15000, [mode]);
+  usePoll(() => { api.trades(mode).then(setRows).catch(() => setRows([])); }, 15000, [mode]);
   return (
-    <div style={card}>
-      <h2>Trade Journal ({rows.length}) · {mode}</h2>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead><tr><th>entry</th><th>side</th><th>R</th><th>killzone</th>
-          <th>BE early?</th><th>exit</th></tr></thead>
-        <tbody>
-          {rows.map((t, i) => (
-            <tr key={i}>
-              <td>{t.entry_ts}</td><td>{t.side}</td>
-              <td align="center" style={{ color: t.realized_r >= 0 ? "#3fb950" : "#f85149" }}>{t.realized_r}</td>
-              <td>{t.killzone}</td><td align="center">{t.moved_to_be_early ? "⚠️" : "—"}</td>
-              <td>{t.exit_reason}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="card">
+      <div className="spread">
+        <h3 style={{ margin: 0 }}>Trade Journal · {mode}</h3>
+        <span className="badge">{rows.length} trades</span>
+      </div>
+      {rows.length === 0
+        ? <div className="empty">no {mode} trades yet.</div>
+        : <div className="scroll"><table className="table">
+            <thead><tr><th>entry</th><th>side</th><th className="num">R</th><th>killzone</th>
+              <th>BE early?</th><th>exit</th></tr></thead>
+            <tbody>
+              {rows.map((t, i) => (
+                <tr key={i}>
+                  <td className="muted">{t.entry_ts}</td>
+                  <td>{t.side}</td>
+                  <td className={"num " + (t.realized_r >= 0 ? "pos" : "neg")}>{t.realized_r}</td>
+                  <td className="muted">{t.killzone}</td>
+                  <td>{t.moved_to_be_early ? <span className="badge amber">⚠ BE</span> : "—"}</td>
+                  <td className="muted">{t.exit_reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>}
+      <p className="hint" style={{ marginTop: 12, marginBottom: 0 }}>
+        Auto-detected setup elements (FVG / IFVG / SMT / PSP / killzone / path) and a Claude
+        grade attach to each trade in Phases D–E.
+      </p>
     </div>
   );
 }
@@ -300,92 +442,68 @@ function LogTradeView({ authed }: { authed: boolean }) {
       .then((r) => setMsg("logged: " + JSON.stringify(r)))
       .catch((e) => setMsg("error: " + String(e)));
   return (
-    <div style={card}>
-      <h2>Log a paper trade → demo analytics</h2>
-      <p style={{ fontSize: 13, opacity: 0.8 }}>
-        Record each TradingView Paper-Trading fill here so it feeds the Per-Bucket / Equity /
-        Journal tabs (view them under <b>demo</b>). Be honest about <b>moved-to-breakeven-early</b> —
-        that bucket is the whole point.
+    <div className="card">
+      <h3>Log a paper trade → demo analytics</h3>
+      <p className="hint">
+        Record each TradingView Paper-Trading fill so it feeds the Analytics / Equity / Journal
+        (under <b>demo</b>). Be honest about <b>moved-to-breakeven-early</b> — that bucket is the
+        whole point. (Phase C adds click-to-log directly on the chart.)
       </p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, maxWidth: 560 }}>
-        <label>side
-          <select value={f.side} onChange={(e) => set("side", e.target.value)} style={inp}>
+      <div className="grid cols-2" style={{ maxWidth: 620 }}>
+        <div className="field"><label>side</label>
+          <select className="input" value={f.side} onChange={(e) => set("side", e.target.value)}>
             <option value="long">long</option><option value="short">short</option>
-          </select></label>
-        <label>realized R
-          <input type="number" step="0.1" value={f.realized_r}
-            onChange={(e) => set("realized_r", e.target.value)} style={inp} /></label>
-        <label>killzone
-          <select value={f.killzone} onChange={(e) => set("killzone", e.target.value)} style={inp}>
+          </select></div>
+        <div className="field"><label>realized R</label>
+          <input className="input" type="number" step="0.1" value={f.realized_r}
+            onChange={(e) => set("realized_r", e.target.value)} /></div>
+        <div className="field"><label>killzone</label>
+          <select className="input" value={f.killzone} onChange={(e) => set("killzone", e.target.value)}>
             <option value="ny_am">ny_am</option><option value="silver_bullet">silver_bullet</option>
             <option value="lunch">lunch</option><option value="none">none</option>
-          </select></label>
-        <label>quarter idx
-          <input type="number" value={f.quarter_idx}
-            onChange={(e) => set("quarter_idx", e.target.value)} style={inp} /></label>
-        <label>exit reason
-          <select value={f.exit_reason} onChange={(e) => set("exit_reason", e.target.value)} style={inp}>
+          </select></div>
+        <div className="field"><label>quarter idx</label>
+          <input className="input" type="number" value={f.quarter_idx}
+            onChange={(e) => set("quarter_idx", e.target.value)} /></div>
+        <div className="field"><label>exit reason</label>
+          <select className="input" value={f.exit_reason} onChange={(e) => set("exit_reason", e.target.value)}>
             <option value="runner_target">runner_target</option><option value="tp">tp</option>
             <option value="stop">stop</option><option value="be">be</option>
             <option value="trail">trail</option><option value="manual">manual</option>
-          </select></label>
-        <label style={{ alignSelf: "end" }}>
+          </select></div>
+        <div className="field"><label>note</label>
+          <input className="input" value={f.note} onChange={(e) => set("note", e.target.value)} /></div>
+        <label className="field-inline">
           <input type="checkbox" checked={f.path_clean}
             onChange={(e) => set("path_clean", e.target.checked)} /> path clean</label>
-        <label style={{ alignSelf: "end" }}>
+        <label className="field-inline">
           <input type="checkbox" checked={f.moved_to_be_early}
-            onChange={(e) => set("moved_to_be_early", e.target.checked)} /> moved to BE early ⚠️</label>
-        <label>note
-          <input value={f.note} onChange={(e) => set("note", e.target.value)} style={inp} /></label>
+            onChange={(e) => set("moved_to_be_early", e.target.checked)} /> moved to BE early ⚠</label>
       </div>
-      <div style={{ marginTop: 10 }}>
-        <button onClick={submit}
-          style={{ background: "#1f6feb", color: "#fff", border: "none", padding: "6px 14px",
-                   borderRadius: 6, cursor: "pointer" }}>
-          Log trade
-        </button>
-        {!authed && <span style={{ marginLeft: 10, fontSize: 13, opacity: 0.7 }}>
-          (log in first — top-right — to authorize)</span>}
+      <div className="row" style={{ marginTop: 14 }}>
+        <button className="btn primary" onClick={submit}>Log trade</button>
+        {!authed && <span className="faint">log in (top-right) to authorize</span>}
       </div>
-      <p style={{ wordBreak: "break-all" }}>{msg}</p>
+      {msg && <p className="mono" style={{ wordBreak: "break-all", fontSize: 12 }}>{msg}</p>}
     </div>
   );
 }
-
-const inp: React.CSSProperties = {
-  display: "block", width: "100%", marginTop: 2, padding: 6,
-  background: "#0d1117", color: "#e6e6e6", border: "1px solid #30363d", borderRadius: 4,
-};
 
 function ControlView({ authed }: { authed: boolean }) {
   const [msg, setMsg] = useState("");
   const run = (p: Promise<any>) =>
-    p.then((r) => setMsg(JSON.stringify(r))).catch((e) => setMsg("error: " + String(e)));
+    p.then((r) => setMsg(JSON.stringify(r, null, 2))).catch((e) => setMsg("error: " + String(e)));
   return (
-    <div style={card}>
-      <h2>Control</h2>
-      {!authed && <p style={{ color: "#d29922", fontSize: 13 }}>
-        Log in (top-right) to authorize control actions.</p>}
-      <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-        <button onClick={() => run(api.testBroker())}
-          style={{ background: "#1f6feb", color: "#fff", border: "none", padding: "6px 12px",
-                   borderRadius: 6, cursor: "pointer" }}>
-          Test Tradovate connection
-        </button>
-        <button onClick={() => run(api.kill())}
-          style={{ background: "#f85149", color: "#fff", border: "none", padding: "6px 12px",
-                   borderRadius: 6, cursor: "pointer" }}>
-          KILL
-        </button>
-        <button onClick={() => run(api.resume())}
-          style={{ background: "#238636", color: "#fff", border: "none", padding: "6px 12px",
-                   borderRadius: 6, cursor: "pointer" }}>
-          Resume
-        </button>
+    <div className="card">
+      <h3>Control &amp; Risk</h3>
+      {!authed && <p className="badge amber" style={{ marginBottom: 12 }}>
+        log in (top-right) to authorize control actions</p>}
+      <div className="row">
+        <button className="btn primary" onClick={() => run(api.testBroker())}>Test Tradovate connection</button>
+        <button className="btn danger" onClick={() => run(api.kill())}>KILL</button>
+        <button className="btn success" onClick={() => run(api.resume())}>Resume</button>
       </div>
-      <p style={{ wordBreak: "break-all" }}>{msg}</p>
+      {msg && <pre className="out" style={{ marginTop: 12 }}>{msg}</pre>}
     </div>
   );
 }
-
-const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
