@@ -118,6 +118,14 @@ class BacktestRequest(BaseModel):
     slippage: float = 0.25
 
 
+class LoginRequest(BaseModel):
+    """Dashboard login (single-user cockpit). The password is the user's own self-set
+    value (ICT_TRADER_DASHBOARD_PASSWORD), falling back to the control token."""
+
+    user: str = ""
+    password: str = ""
+
+
 class LogTradeRequest(BaseModel):
     """A manually-journaled trade (e.g. a TradingView Paper-Trading fill)."""
 
@@ -187,12 +195,51 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def get_state() -> AppState:
         return state
 
+    def require_view(authorization: str | None = Header(default=None)) -> None:
+        """Gate the read API when login is required (makes the public URL private).
+
+        A no-op unless ICT_TRADER_REQUIRE_LOGIN is set; then a valid Bearer token (the
+        one /api/login hands back, == the control token) is required to read anything.
+        """
+        if not settings.require_login:
+            return
+        token = (authorization or "").removeprefix("Bearer ").strip()
+        expected = settings.control_token
+        if not expected or not hmac.compare_digest(token, expected):
+            raise HTTPException(status_code=401, detail="login required")
+
     @app.get("/healthz")
     async def healthz() -> dict:
         return {"ok": True, "mode": settings.mode.value}
 
+    @app.get("/api/auth/config")
+    async def auth_config() -> dict:
+        """Public: lets the SPA know whether to show a login screen first."""
+        return {"login_required": settings.require_login, "user": settings.dashboard_user}
+
+    @app.post("/api/login")
+    async def login(req: LoginRequest) -> dict:
+        """Validate the user's own credentials and hand back the control token.
+
+        The token then authorizes both reads (when login is required) and control
+        actions, so the user never has to paste a token by hand.
+        """
+        expected_pw = settings.login_password
+        if not expected_pw:
+            raise HTTPException(
+                status_code=503,
+                detail="no dashboard password configured (set ICT_TRADER_DASHBOARD_PASSWORD "
+                "or ICT_TRADER_CONTROL_TOKEN)",
+            )
+        user_ok = hmac.compare_digest(req.user or "", settings.dashboard_user)
+        pw_ok = hmac.compare_digest(req.password or "", expected_pw)
+        if not (user_ok and pw_ok):
+            raise HTTPException(status_code=401, detail="invalid credentials")
+        return {"ok": True, "token": settings.control_token, "user": settings.dashboard_user}
+
     @app.get("/api/status")
-    async def status(st: AppState = Depends(get_state)) -> dict:
+    async def status(st: AppState = Depends(get_state),
+                     _: None = Depends(require_view)) -> dict:
         engine_running = st.engine_task is not None and not st.engine_task.done()
         return {
             "mode": st.settings.mode.value,
@@ -208,20 +255,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
 
     @app.get("/api/analytics/summary")
-    async def analytics_summary(mode: str = "backtest", st: AppState = Depends(get_state)) -> dict:
+    async def analytics_summary(mode: str = "backtest", st: AppState = Depends(get_state),
+                                _: None = Depends(require_view)) -> dict:
         async with st.db.session() as s:
             trades = await Repository(s).list_trades(TradeMode(mode))
         return summarize(trades)
 
     @app.get("/api/analytics/equity")
-    async def analytics_equity(mode: str = "backtest", st: AppState = Depends(get_state)) -> list:
+    async def analytics_equity(mode: str = "backtest", st: AppState = Depends(get_state),
+                               _: None = Depends(require_view)) -> list:
         async with st.db.session() as s:
             trades = await Repository(s).list_trades(TradeMode(mode))
         return equity_curve(trades)
 
     @app.get("/api/analytics/calibration")
     async def analytics_calibration(mode: str = "backtest",
-                                    st: AppState = Depends(get_state)) -> dict:
+                                    st: AppState = Depends(get_state),
+                                    _: None = Depends(require_view)) -> dict:
         async with st.db.session() as s:
             repo = Repository(s)
             trades = await repo.list_trades(TradeMode(mode))
@@ -244,7 +294,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/trades")
     async def list_trades(mode: str = "backtest", limit: int = 500,
-                          st: AppState = Depends(get_state)) -> list:
+                          st: AppState = Depends(get_state),
+                          _: None = Depends(require_view)) -> list:
         async with st.db.session() as s:
             trades = await Repository(s).list_trades(TradeMode(mode))
         return [
@@ -261,7 +312,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ]
 
     @app.get("/api/webhooks")
-    async def list_webhooks(limit: int = 100, st: AppState = Depends(get_state)) -> list:
+    async def list_webhooks(limit: int = 100, st: AppState = Depends(get_state),
+                            _: None = Depends(require_view)) -> list:
         """Recent TradingView alerts that landed on /webhooks/pine (signals + trades)."""
         async with st.db.session() as s:
             rows = await Repository(s).list_webhooks(limit)

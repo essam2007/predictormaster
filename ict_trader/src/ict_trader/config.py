@@ -61,11 +61,23 @@ class Settings(BaseSettings):
     control_token: str = ""
     webhook_secret: str = ""
 
+    # Dashboard login (makes the hosted deck a private, single-user cockpit). When
+    # require_login is true the read API is gated too, so the public URL shows a login
+    # screen first. The password defaults to the control token if not set separately.
+    require_login: bool = False
+    dashboard_user: str = "admin"
+    dashboard_password: str = ""
+
     symbol_traded: Symbol = Symbol.NQ  # the instrument we route orders for
 
     @property
     def is_live(self) -> bool:
         return self.mode is TradeMode.LIVE
+
+    @property
+    def login_password(self) -> str:
+        """The effective dashboard password (falls back to the control token)."""
+        return self.dashboard_password or self.control_token
 
     @property
     def tradovate_base_url(self) -> str:

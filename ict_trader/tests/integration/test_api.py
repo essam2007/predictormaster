@@ -136,6 +136,69 @@ def test_log_trade_feeds_demo_analytics(client):
     assert "be_early" in be and "no_be_early" in be
 
 
+def test_auth_config_public_and_open_by_default(client):
+    """With login not required, /api/auth/config says so and reads are open."""
+    c, _ = client
+    cfg = c.get("/api/auth/config").json()
+    assert cfg["login_required"] is False
+    # reads work without any token when login isn't required
+    assert c.get("/api/status").status_code == 200
+
+
+def test_login_returns_control_token(client):
+    """Login validates the dashboard creds and hands back the control token."""
+    c, _ = client
+    # default dashboard_user is "admin"; password falls back to the control token
+    bad = c.post("/api/login", json={"user": "admin", "password": "wrong"})
+    assert bad.status_code == 401
+    ok = c.post("/api/login", json={"user": "admin", "password": "secret"})
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["ok"] is True and body["token"] == "secret" and body["user"] == "admin"
+
+
+@pytest.fixture
+def locked_client(tmp_path):
+    """A deck that requires login (the hosted-cockpit config)."""
+    db = tmp_path / "locked.db"
+    settings = Settings(
+        db_url=f"sqlite+aiosqlite:///{db}", control_token="tok",
+        require_login=True, dashboard_user="trader", dashboard_password="s3cret",
+    )
+    app = create_app(settings)
+    with TestClient(app) as c:
+        yield c
+
+
+def test_require_login_gates_reads(locked_client):
+    c = locked_client
+    # config advertises the gate; healthz + login stay public
+    cfg = c.get("/api/auth/config").json()
+    assert cfg["login_required"] is True and cfg["user"] == "trader"
+    assert c.get("/healthz").status_code == 200
+    # reads are blocked without a token
+    assert c.get("/api/status").status_code == 401
+    assert c.get("/api/analytics/summary?mode=demo").status_code == 401
+    # wrong creds rejected
+    assert c.post("/api/login", json={"user": "trader", "password": "nope"}).status_code == 401
+    # correct creds -> token; authed reads pass
+    token = c.post("/api/login", json={"user": "trader", "password": "s3cret"}).json()["token"]
+    assert token == "tok"
+    h = {"Authorization": f"Bearer {token}"}
+    assert c.get("/api/status", headers=h).status_code == 200
+    assert c.get("/api/analytics/summary?mode=demo", headers=h).status_code == 200
+    # the webhook stays public (TradingView can't send a bearer token)
+    assert c.post("/webhooks/pine", json={"source": "pine", "bias": "long"}).status_code == 200
+
+
+def test_login_503_when_no_password_configured(tmp_path):
+    db = tmp_path / "nopw.db"
+    settings = Settings(db_url=f"sqlite+aiosqlite:///{db}")  # no control token, no password
+    app = create_app(settings)
+    with TestClient(app) as c:
+        assert c.post("/api/login", json={"user": "admin", "password": "x"}).status_code == 503
+
+
 def test_broker_test_requires_auth_and_reports_unconfigured(client, monkeypatch):
     c, _ = client
     # no auth -> 401

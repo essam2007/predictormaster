@@ -23,6 +23,13 @@ services:
         generateValue: true         # auto-generated; read it in the Render dashboard
       - key: ICT_TRADER_WEBHOOK_SECRET
         generateValue: true
+      # Private cockpit: require login so the public URL shows a sign-in screen first.
+      - key: ICT_TRADER_REQUIRE_LOGIN
+        value: "true"
+      - key: ICT_TRADER_DASHBOARD_USER
+        sync: false                 # your username — set it in the Render dashboard
+      - key: ICT_TRADER_DASHBOARD_PASSWORD
+        sync: false                 # your OWN password; if blank, the control token is used
       # Tradovate DEMO creds — set these in the Render dashboard (not stored in git):
       - key: TRADOVATE_NAME
         sync: false

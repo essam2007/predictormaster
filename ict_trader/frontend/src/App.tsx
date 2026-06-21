@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { api, type Status, type Summary, type EquityPoint, type WebhookAlert } from "./api";
+import {
+  api, getToken, setToken as storeToken, clearToken, setUnauthorizedHandler,
+  type AuthConfig, type Status, type Summary, type EquityPoint, type WebhookAlert,
+} from "./api";
 
 // Re-run `fn` on mount, when `deps` change, and every `ms` so live paper activity shows
 // without a manual reload.
@@ -33,17 +36,52 @@ export function App() {
   const [tab, setTab] = useState<Tab>("Status");
   // backtest = seeded/replay results; demo = live paper trades from your account; live = real.
   const [mode, setMode] = useState<string>("backtest");
+  const [cfg, setCfg] = useState<AuthConfig | null>(null);
+  const [authed, setAuthed] = useState<boolean>(!!getToken());
+  const [showLogin, setShowLogin] = useState(false);
+
+  useEffect(() => {
+    // A 401 anywhere (expired/cleared token) drops us back to the login screen.
+    setUnauthorizedHandler(() => { clearToken(); setAuthed(false); });
+    api.authConfig()
+      .then(setCfg)
+      .catch(() => setCfg({ login_required: false, user: "admin" }));
+  }, []);
+
+  const onLoggedIn = (token: string) => { storeToken(token); setAuthed(true); setShowLogin(false); };
+  const logout = () => { clearToken(); setAuthed(false); };
+
+  // When the host requires login, the whole deck is gated until the user signs in.
+  if (cfg === null) return <div style={{ ...card, maxWidth: 420, margin: "80px auto" }}>loading…</div>;
+  if ((cfg.login_required && !authed) || showLogin) {
+    return <LoginView user={cfg.user} onLoggedIn={onLoggedIn}
+      onCancel={cfg.login_required ? undefined : () => setShowLogin(false)} />;
+  }
+
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ fontSize: 20 }}>ICT Trader — Research Deck</h1>
-        <label style={{ fontSize: 13 }}>
-          data:{" "}
-          <select value={mode} onChange={(e) => setMode(e.target.value)}
-            style={{ background: "#21262d", color: "#fff", border: "1px solid #30363d", padding: 4 }}>
-            {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </label>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 13 }}>
+          <label>
+            data:{" "}
+            <select value={mode} onChange={(e) => setMode(e.target.value)}
+              style={{ background: "#21262d", color: "#fff", border: "1px solid #30363d", padding: 4 }}>
+              {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </label>
+          {authed
+            ? <button onClick={logout}
+                style={{ background: "#21262d", color: "#fff", border: "1px solid #30363d",
+                         padding: "5px 10px", borderRadius: 6, cursor: "pointer" }}>
+                Logout
+              </button>
+            : <button onClick={() => setShowLogin(true)}
+                style={{ background: "#1f6feb", color: "#fff", border: "none",
+                         padding: "5px 10px", borderRadius: 6, cursor: "pointer" }}>
+                Login
+              </button>}
+        </div>
       </div>
       <nav style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
         {TABS.map((t) => (
@@ -59,8 +97,56 @@ export function App() {
       {tab === "Per-Bucket Analytics" && <BucketsView mode={mode} />}
       {tab === "Equity" && <EquityView mode={mode} />}
       {tab === "Trade Journal" && <JournalView mode={mode} />}
-      {tab === "Log Trade" && <LogTradeView />}
-      {tab === "Control" && <ControlView />}
+      {tab === "Log Trade" && <LogTradeView authed={authed} />}
+      {tab === "Control" && <ControlView authed={authed} />}
+    </div>
+  );
+}
+
+function LoginView({ user, onLoggedIn, onCancel }: {
+  user: string; onLoggedIn: (token: string) => void; onCancel?: () => void;
+}) {
+  const [u, setU] = useState(user);
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setBusy(true); setErr("");
+    api.login(u, pw)
+      .then((r) => onLoggedIn(r.token))
+      .catch(() => setErr("invalid credentials"))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <div style={{ maxWidth: 380, margin: "80px auto" }}>
+      <div style={card}>
+        <h1 style={{ fontSize: 20, marginTop: 0 }}>ICT Trader</h1>
+        <p style={{ fontSize: 13, opacity: 0.8 }}>Sign in to your private strategy dashboard.</p>
+        <form onSubmit={submit}>
+          <label style={{ fontSize: 13 }}>username
+            <input value={u} onChange={(e) => setU(e.target.value)} autoFocus style={inp} /></label>
+          <label style={{ fontSize: 13, display: "block", marginTop: 8 }}>password
+            <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} style={inp} /></label>
+          {err && <p style={{ color: "#f85149", fontSize: 13 }}>{err}</p>}
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button type="submit" disabled={busy}
+              style={{ background: "#1f6feb", color: "#fff", border: "none",
+                       padding: "8px 16px", borderRadius: 6, cursor: "pointer" }}>
+              {busy ? "…" : "Sign in"}
+            </button>
+            {onCancel && <button type="button" onClick={onCancel}
+              style={{ background: "#21262d", color: "#fff", border: "1px solid #30363d",
+                       padding: "8px 16px", borderRadius: 6, cursor: "pointer" }}>
+              Cancel
+            </button>}
+          </div>
+        </form>
+        <p style={{ fontSize: 12, opacity: 0.6, marginBottom: 0 }}>
+          Your password is the value you set in <code>ICT_TRADER_DASHBOARD_PASSWORD</code>
+          (or the control token if unset). Nothing is sent anywhere but your own deck.
+        </p>
+      </div>
     </div>
   );
 }
@@ -202,8 +288,7 @@ function JournalView({ mode }: { mode: string }) {
   );
 }
 
-function LogTradeView() {
-  const [token, setToken] = useState("");
+function LogTradeView({ authed }: { authed: boolean }) {
   const [f, setF] = useState<Record<string, any>>({
     side: "long", realized_r: 1.0, killzone: "ny_am", quarter_idx: 2,
     path_clean: true, moved_to_be_early: false, exit_reason: "tp", note: "",
@@ -211,7 +296,7 @@ function LogTradeView() {
   const [msg, setMsg] = useState("");
   const set = (k: string, v: any) => setF((p) => ({ ...p, [k]: v }));
   const submit = () =>
-    api.logTrade(token, { ...f, realized_r: Number(f.realized_r), quarter_idx: Number(f.quarter_idx), mode: "demo" })
+    api.logTrade({ ...f, realized_r: Number(f.realized_r), quarter_idx: Number(f.quarter_idx), mode: "demo" })
       .then((r) => setMsg("logged: " + JSON.stringify(r)))
       .catch((e) => setMsg("error: " + String(e)));
   return (
@@ -254,12 +339,13 @@ function LogTradeView() {
           <input value={f.note} onChange={(e) => set("note", e.target.value)} style={inp} /></label>
       </div>
       <div style={{ marginTop: 10 }}>
-        <input placeholder="control token" value={token} onChange={(e) => setToken(e.target.value)}
-          style={{ ...inp, width: 240 }} />
         <button onClick={submit}
-          style={{ marginLeft: 8, background: "#1f6feb", color: "#fff", border: "none", padding: "6px 14px" }}>
+          style={{ background: "#1f6feb", color: "#fff", border: "none", padding: "6px 14px",
+                   borderRadius: 6, cursor: "pointer" }}>
           Log trade
         </button>
+        {!authed && <span style={{ marginLeft: 10, fontSize: 13, opacity: 0.7 }}>
+          (log in first — top-right — to authorize)</span>}
       </div>
       <p style={{ wordBreak: "break-all" }}>{msg}</p>
     </div>
@@ -271,25 +357,29 @@ const inp: React.CSSProperties = {
   background: "#0d1117", color: "#e6e6e6", border: "1px solid #30363d", borderRadius: 4,
 };
 
-function ControlView() {
-  const [token, setToken] = useState("");
+function ControlView({ authed }: { authed: boolean }) {
   const [msg, setMsg] = useState("");
+  const run = (p: Promise<any>) =>
+    p.then((r) => setMsg(JSON.stringify(r))).catch((e) => setMsg("error: " + String(e)));
   return (
     <div style={card}>
       <h2>Control</h2>
-      <input placeholder="control token" value={token} onChange={(e) => setToken(e.target.value)}
-        style={{ padding: 6, width: 280 }} />
+      {!authed && <p style={{ color: "#d29922", fontSize: 13 }}>
+        Log in (top-right) to authorize control actions.</p>}
       <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-        <button onClick={() => api.testBroker(token).then((r) => setMsg(JSON.stringify(r)))}
-          style={{ background: "#1f6feb", color: "#fff", border: "none", padding: "6px 12px" }}>
+        <button onClick={() => run(api.testBroker())}
+          style={{ background: "#1f6feb", color: "#fff", border: "none", padding: "6px 12px",
+                   borderRadius: 6, cursor: "pointer" }}>
           Test Tradovate connection
         </button>
-        <button onClick={() => api.kill(token).then((r) => setMsg(JSON.stringify(r)))}
-          style={{ background: "#f85149", color: "#fff", border: "none", padding: "6px 12px" }}>
+        <button onClick={() => run(api.kill())}
+          style={{ background: "#f85149", color: "#fff", border: "none", padding: "6px 12px",
+                   borderRadius: 6, cursor: "pointer" }}>
           KILL
         </button>
-        <button onClick={() => api.resume(token).then((r) => setMsg(JSON.stringify(r)))}
-          style={{ background: "#238636", color: "#fff", border: "none", padding: "6px 12px" }}>
+        <button onClick={() => run(api.resume())}
+          style={{ background: "#238636", color: "#fff", border: "none", padding: "6px 12px",
+                   borderRadius: 6, cursor: "pointer" }}>
           Resume
         </button>
       </div>

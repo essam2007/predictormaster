@@ -15,7 +15,22 @@ takes ~30–60s) and its data is ephemeral (sample data reseeds on each boot).
 3. Render shows the blueprint (one web service, Docker). Click **Apply / Create**. First
    build takes a few minutes (it builds the UI + API).
 4. When it's live, Render gives you a URL like **`https://ict-trader-deck.onrender.com`** —
-   that's your clickable deck. Open it: the analytics tabs are pre-seeded.
+   that's your clickable deck. It opens to a **login screen** (see below); sign in and the
+   analytics tabs are pre-seeded.
+
+## Your private login (single-user cockpit)
+
+The blueprint ships `ICT_TRADER_REQUIRE_LOGIN=true`, so the public URL shows a **sign-in
+screen** first — only you get in. Set your own credentials in Render → Environment:
+
+- **`ICT_TRADER_DASHBOARD_USER`** — your username (defaults to `admin` if left blank).
+- **`ICT_TRADER_DASHBOARD_PASSWORD`** — **your own** password. If you leave it blank it
+  falls back to the auto-generated `ICT_TRADER_CONTROL_TOKEN` (find it under Environment).
+
+Signing in stores a token in your browser and also authorizes the control actions (kill
+switch, broker test, Log-Trade), so you never paste a token by hand. These are your
+details on your own deck — nothing is sent anywhere else. To run the deck **open** (e.g.
+locally), set `ICT_TRADER_REQUIRE_LOGIN=false`.
 
 ## Demo-only? Leave the Tradovate fields blank.
 
