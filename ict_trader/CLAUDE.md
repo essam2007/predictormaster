@@ -103,9 +103,12 @@ user clicks Manual Deploy). Local: `python scripts/run_all.py` or `run-deck-mac.
   Journal. Seed grades the demo trades.
 - **C — Click-to-log tool**: click a chart point → choose entry → `POST /api/log-entry`
   creates a demo trade; trade↔chart linkage; the entry feeds the dataset.
-- **E — Claude grading**: `llm/grader.py` (Anthropic SDK) → narrative grade (A–F) + rationale
-  per trade; needs `ANTHROPIC_API_KEY`, no-ops without. Consult the `claude-api` skill for the
-  current model id/params at build time.
+- **E — Claude grading** ✅ shipped. `llm/grader.py` (lazy `anthropic` SDK, cost-efficient model
+  via `ICT_TRADER_GRADER_MODEL`) grades each logged trade's SETUP quality (A–F + ≤2-sentence
+  rationale, penalizing breakeven-early). Optional + no-op without `ANTHROPIC_API_KEY`; runs
+  off-thread on log; stored in `trade_analysis.llm_grade/llm_rationale`; shown in the Journal
+  expand. `anthropic` is the optional `[llm]` extra (not in CI). render.yaml has `ANTHROPIC_API_KEY`
+  (sync:false).
 - **F — Dataset** ✅ shipped. `/api/dataset` (preview) + `/api/dataset/export?format=jsonl|csv`
   flatten every trade to a labeled feature row (tags + detected-element booleans + outcome
   `realized_r`/`win`); Dataset section previews the table and downloads JSONL/CSV.

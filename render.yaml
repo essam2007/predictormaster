@@ -30,6 +30,12 @@ services:
         sync: false                 # your username — set it in the Render dashboard
       - key: ICT_TRADER_DASHBOARD_PASSWORD
         sync: false                 # your OWN password; if blank, the control token is used
+      # Optional: add your Anthropic key to enable the Claude narrative trade-grader (Phase E).
+      # Leave blank and the deterministic detector grade is used alone (no AI cost).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ICT_TRADER_GRADER_MODEL
+        sync: false                 # optional model override (default: a cost-efficient Claude)
       # Tradovate DEMO creds — set these in the Render dashboard (not stored in git):
       - key: TRADOVATE_NAME
         sync: false

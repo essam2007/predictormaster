@@ -42,6 +42,7 @@ from ..domain.enums import (
 from ..domain.trades import Trade
 from ..execution.kill_switch import KillSwitch
 from ..execution.risk import RiskEngine
+from ..llm.grader import grade_available, grade_trade
 from ..store.db import Database
 from ..store.repositories import Repository, bar_epoch
 from .ws import LiveHub
@@ -162,7 +163,8 @@ def _rows_to_bars(rows: list, symbol: str) -> list[Bar]:
 
 async def _analyze_and_store(
     repo: Repository, trade_id: int, *, side: str, entry_ts: datetime, mode: str,
-    killzone: str, path_clean: bool, moved_to_be_early: bool, symbol: str = "NQ",
+    killzone: str, path_clean: bool, moved_to_be_early: bool, realized_r: float = 0.0,
+    symbol: str = "NQ",
 ) -> None:
     """Run the detector suite over the trade's bar window and persist the grade.
 
@@ -175,7 +177,20 @@ async def _analyze_and_store(
             side=side, entry_ts=entry_ts, bars=bars, killzone=killzone,
             path_clean=path_clean, moved_to_be_early=moved_to_be_early,
         )
-        await repo.save_trade_analysis(trade_id, mode, analysis.to_dict())
+        # Optional Claude narrative grade (Phase E) — no-ops instantly without ANTHROPIC_API_KEY;
+        # when configured, run off-thread so the network call doesn't block the event loop.
+        llm_grade = llm_rationale = None
+        if grade_available():
+            import anyio
+            llm = await anyio.to_thread.run_sync(
+                lambda: grade_trade(
+                    side=side, realized_r=realized_r, elements=analysis.to_dict()["elements"],
+                    summary=analysis.summary, killzone=killzone,
+                    moved_to_be_early=moved_to_be_early))
+            if llm is not None:
+                llm_grade, llm_rationale = llm.grade, f"[{llm.model}] {llm.rationale}"
+        await repo.save_trade_analysis(
+            trade_id, mode, analysis.to_dict(), llm_grade=llm_grade, llm_rationale=llm_rationale)
     except Exception:  # noqa: BLE001 - analysis is advisory, never fatal to logging
         pass
 
@@ -551,7 +566,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 repo, tid, side=trade.side.value, entry_ts=trade.entry_ts,
                 mode=trade.mode.value, killzone=trade.killzone.value,
                 path_clean=trade.path_clean, moved_to_be_early=trade.moved_to_be_early,
-                symbol=trade.symbol.value)
+                realized_r=trade.realized_r, symbol=trade.symbol.value)
         return {"ok": True, "mode": trade.mode.value, "realized_r": trade.realized_r}
 
     @app.post("/api/broker/test")
@@ -618,7 +633,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await _analyze_and_store(
                     repo, tid, side=trade.side.value, entry_ts=trade.entry_ts, mode="demo",
                     killzone=trade.killzone.value, path_clean=trade.path_clean,
-                    moved_to_be_early=trade.moved_to_be_early, symbol=trade.symbol.value)
+                    moved_to_be_early=trade.moved_to_be_early, realized_r=trade.realized_r,
+                    symbol=trade.symbol.value)
                 trade_logged = True
         await st.hub.broadcast({"type": "pine_alert", "alert": payload})
         return {"ok": True, "trade_logged": trade_logged, "bars_added": bars_added}

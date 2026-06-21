@@ -122,11 +122,14 @@ class Repository:
             stmt = stmt.where(TradeRow.mode == mode.value)
         return list((await self.s.execute(stmt.order_by(TradeRow.entry_ts))).scalars().all())
 
-    async def save_trade_analysis(self, trade_id: int, mode: str, analysis: dict) -> None:
+    async def save_trade_analysis(
+        self, trade_id: int, mode: str, analysis: dict,
+        llm_grade: str | None = None, llm_rationale: str | None = None,
+    ) -> None:
         self.s.add(TradeAnalysisRow(
             trade_id=trade_id, mode=mode, score=analysis["score"], grade=analysis["grade"],
             summary=analysis["summary"], elements=analysis["elements"], model=analysis["model"],
-            created_at=datetime.now(UTC),
+            llm_grade=llm_grade, llm_rationale=llm_rationale, created_at=datetime.now(UTC),
         ))
         await self.s.commit()
 

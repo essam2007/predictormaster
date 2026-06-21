@@ -454,6 +454,13 @@ function JournalView({ mode }: { mode: string }) {
                                 </span>
                               ))}
                             </div>
+                            {analysis.llm_grade && (
+                              <p className="lead" style={{ fontSize: 13, marginTop: 10, marginBottom: 0 }}>
+                                <span className={"badge " + gradeTone(analysis.llm_grade)}>
+                                  Claude {analysis.llm_grade}</span>{" "}
+                                {analysis.llm_rationale}
+                              </p>
+                            )}
                           </div>
                         : <span className="faint">loading analysis…</span>}
                     </td></tr>

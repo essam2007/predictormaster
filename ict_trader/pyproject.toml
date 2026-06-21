@@ -43,6 +43,11 @@ dev = [
     "ruff>=0.4",
     "mypy>=1.10",
 ]
+# Optional Claude trade-grader (Phase E). The grader imports anthropic lazily and no-ops
+# without ANTHROPIC_API_KEY, so this extra is only needed to actually call the model.
+llm = [
+    "anthropic>=0.40",
+]
 
 [project.scripts]
 ict-backtest = "ict_trader.backtest.cli:main"
