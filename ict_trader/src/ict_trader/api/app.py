@@ -36,7 +36,7 @@ from ..domain.trades import Trade
 from ..execution.kill_switch import KillSwitch
 from ..execution.risk import RiskEngine
 from ..store.db import Database
-from ..store.repositories import Repository
+from ..store.repositories import Repository, bar_epoch
 from .ws import LiveHub
 
 
@@ -63,6 +63,37 @@ def _enum(enum_cls: Any, value: Any, default: Any) -> Any:
         return enum_cls(value)
     except (ValueError, KeyError):
         return default
+
+
+def _normalize_bars(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Accept the compact keys a Pine alert sends (t/o/h/l/c/v) or full names, and convert
+    the timestamp (unix seconds or ISO string) to a tz-aware datetime."""
+    def pick(b: dict[str, Any], *keys: str) -> Any:
+        for k in keys:
+            if b.get(k) is not None:
+                return b[k]
+        return None
+
+    out: list[dict[str, Any]] = []
+    for b in raw:
+        t = pick(b, "t", "time", "ts")
+        o, h, low, c = pick(b, "o", "open"), pick(b, "h", "high"), pick(b, "l", "low"), pick(b, "c", "close")
+        if t is None or None in (o, h, low, c):
+            continue  # skip a malformed bar rather than rejecting the whole alert
+        if isinstance(t, int | float):
+            ts = datetime.fromtimestamp(float(t), tz=UTC)
+        else:
+            ts = datetime.fromisoformat(str(t).replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=UTC)
+        try:
+            out.append({
+                "ts": ts, "open": float(o), "high": float(h), "low": float(low),
+                "close": float(c), "volume": float(pick(b, "v", "volume") or 0.0),
+            })
+        except (TypeError, ValueError):
+            continue
+    return out
 
 
 def _make_trade(
@@ -167,6 +198,10 @@ class PineAlert(BaseModel):
     path_clean: bool = True
     day_of_week: int = -1
     note: str = ""
+    # chart-data fields: a Pine bar-feed alert carries the latest closed OHLC bar(s) so the
+    # deck can draw real candles + run detectors over a trade's window (no broker API).
+    timeframe: str | None = None
+    bars: list[dict[str, Any]] = []
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -319,6 +354,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             rows = await Repository(s).list_webhooks(limit)
         return [{"ts": r.ts.isoformat(), "matched": r.matched, **r.payload} for r in rows]
 
+    @app.get("/api/bars")
+    async def list_bars(symbol: str = "NQ", timeframe: str = "5", mode: str = "demo",
+                        limit: int = 500, st: AppState = Depends(get_state),
+                        _: None = Depends(require_view)) -> list:
+        """OHLC bars for charting (Lightweight Charts format: unix-second `time`)."""
+        async with st.db.session() as s:
+            rows = await Repository(s).list_bars(mode, symbol, timeframe, limit)
+        return [
+            {"time": bar_epoch(r.ts), "open": r.open, "high": r.high,
+             "low": r.low, "close": r.close, "volume": r.volume}
+            for r in rows
+        ]
+
     @app.post("/api/backtest")
     async def run_backtest(req: BacktestRequest, authorization: str | None = Header(default=None),
                            st: AppState = Depends(get_state)) -> dict:
@@ -408,9 +456,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=403, detail="bad webhook secret")
         payload = alert.model_dump(exclude={"secret"})
         trade_logged = False
+        bars_added = 0
         async with st.db.session() as s:
             repo = Repository(s)
             await repo.log_webhook(datetime.now(UTC), payload)
+            # Bars are ALWAYS stored under demo (a public webhook must never write live data).
+            if alert.bars:
+                bars_added = await repo.add_bars(
+                    "demo", alert.symbol or "NQ", alert.timeframe or "5",
+                    _normalize_bars(alert.bars),
+                )
             # A TradingView *strategy* posts kind="trade" on each closed round-trip, so the
             # per-condition analytics accrue with NO broker API. Webhook trades are ALWAYS
             # demo — a public webhook URL must never be able to write live-mode data.
@@ -428,7 +483,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await repo.add_trade(trade)
                 trade_logged = True
         await st.hub.broadcast({"type": "pine_alert", "alert": payload})
-        return {"ok": True, "trade_logged": trade_logged}
+        return {"ok": True, "trade_logged": trade_logged, "bars_added": bars_added}
 
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:

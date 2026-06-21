@@ -5,12 +5,43 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class BarRow(Base):
+    """OHLC bars, carried in on the TradingView webhook (or seeded) so the deck can draw
+    real candlestick charts and run detectors over a trade's window. One row per closed bar;
+    the natural key (mode, symbol, timeframe, ts) is unique so re-sends are idempotent."""
+
+    __tablename__ = "bars"
+    __table_args__ = (
+        UniqueConstraint("mode", "symbol", "timeframe", "ts", name="uq_bar_natural_key"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mode: Mapped[str] = mapped_column(String(16), index=True, default="demo")
+    symbol: Mapped[str] = mapped_column(String(12), index=True)
+    timeframe: Mapped[str] = mapped_column(String(8), index=True, default="5")
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    open: Mapped[float] = mapped_column(Float)
+    high: Mapped[float] = mapped_column(Float)
+    low: Mapped[float] = mapped_column(Float)
+    close: Mapped[float] = mapped_column(Float)
+    volume: Mapped[float] = mapped_column(Float, default=0.0)
+    source: Mapped[str] = mapped_column(String(16), default="pine")
 
 
 class SetupRow(Base):

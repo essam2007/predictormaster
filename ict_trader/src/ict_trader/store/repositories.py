@@ -3,6 +3,8 @@ Postgres/Timescale switch is a DSN change plus one migration."""
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +19,15 @@ from ..domain.enums import (
 )
 from ..domain.signals import SetupSnapshot
 from ..domain.trades import ManagementEvent, Trade
-from .models import EquityRow, OrderRow, SetupRow, TradeRow, WebhookAlertRow
+from .models import BarRow, EquityRow, OrderRow, SetupRow, TradeRow, WebhookAlertRow
+
+
+def bar_epoch(dt: datetime) -> int:
+    """Unix seconds for a bar timestamp, treating naive datetimes as UTC. SQLite reads
+    tz-aware columns back as naive, so this keeps write/read/dedup epochs consistent."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return int(dt.timestamp())
 
 
 def setup_to_row(s: SetupSnapshot, mode: TradeMode) -> SetupRow:
@@ -106,6 +116,51 @@ class Repository:
     async def list_webhooks(self, limit: int = 100) -> list[WebhookAlertRow]:
         stmt = select(WebhookAlertRow).order_by(WebhookAlertRow.ts.desc()).limit(limit)
         return list((await self.s.execute(stmt)).scalars().all())
+
+    async def add_bars(
+        self, mode: str, symbol: str, timeframe: str,
+        bars: list[dict], source: str = "pine",
+    ) -> int:
+        """Append OHLC bars, skipping any whose timestamp we already have (idempotent re-sends).
+
+        Each ``bars`` entry is a dict with keys ts (datetime), open, high, low, close, volume.
+        Returns the number of NEW rows written.
+        """
+        if not bars:
+            return 0
+        existing_ts = (await self.s.execute(
+            select(BarRow.ts).where(
+                BarRow.mode == mode, BarRow.symbol == symbol, BarRow.timeframe == timeframe,
+            )
+        )).scalars().all()
+        seen = {bar_epoch(t) for t in existing_ts}
+        new_rows: list[BarRow] = []
+        for b in bars:
+            e = bar_epoch(b["ts"])
+            if e in seen:  # already stored, or a duplicate within this batch
+                continue
+            seen.add(e)
+            new_rows.append(BarRow(
+                mode=mode, symbol=symbol, timeframe=timeframe, ts=b["ts"],
+                open=b["open"], high=b["high"], low=b["low"], close=b["close"],
+                volume=b.get("volume", 0.0), source=source,
+            ))
+        self.s.add_all(new_rows)
+        await self.s.commit()
+        return len(new_rows)
+
+    async def list_bars(
+        self, mode: str, symbol: str, timeframe: str, limit: int = 500,
+    ) -> list[BarRow]:
+        """Most recent ``limit`` bars, returned in chronological order for charting."""
+        stmt = (
+            select(BarRow)
+            .where(BarRow.mode == mode, BarRow.symbol == symbol, BarRow.timeframe == timeframe)
+            .order_by(BarRow.ts.desc())
+            .limit(limit)
+        )
+        rows = list((await self.s.execute(stmt)).scalars().all())
+        return list(reversed(rows))
 
     async def add_order(self, row: OrderRow) -> None:
         self.s.add(row)

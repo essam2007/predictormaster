@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import {
   api, getToken, setToken as storeToken, clearToken, setUnauthorizedHandler,
   type AuthConfig, type Status, type Summary, type EquityPoint, type WebhookAlert,
+  type Bar, type JournalTrade,
 } from "./api";
+import { CandleChart } from "./Chart";
 
 // Re-run `fn` on mount, when `deps` change, and every `ms` so live activity shows without a
 // manual reload.
@@ -120,10 +122,7 @@ export function App() {
         </header>
         <div className="content">
           {section === "Overview" && <OverviewView mode={mode} />}
-          {section === "Charts" && <ComingSoon
-            title="Charts / Monitor"
-            phase="Phase B"
-            body="TradingView-style candlestick charts (Lightweight Charts) with the algo's long/short arrows, FVG/IFVG boxes, killzone shading and entry/stop/target lines — fed by OHLC bars carried on the TradingView webhook. The click-to-mark-entry tool (Phase C) lives here." />}
+          {section === "Charts" && <ChartsView mode={mode} />}
           {section === "Backtesting" && <ComingSoon
             title="Backtesting"
             phase="Phase B"
@@ -263,6 +262,39 @@ function OverviewView({ mode }: { mode: string }) {
         </p>
       </div>
     </>
+  );
+}
+
+function ChartsView({ mode }: { mode: string }) {
+  const [bars, setBars] = useState<Bar[]>([]);
+  const [trades, setTrades] = useState<JournalTrade[]>([]);
+  const [err, setErr] = useState("");
+  usePoll(() => {
+    api.bars("NQ", "5", mode, 500).then(setBars).catch((e) => setErr(String(e)));
+    api.trades(mode).then(setTrades).catch(() => setTrades([]));
+  }, 15000, [mode]);
+  return (
+    <div className="card">
+      <div className="spread">
+        <h3 style={{ margin: 0 }}>NQ · 5m · {mode}</h3>
+        <div className="row">
+          <span className="badge green"><span className="dot green" /> long</span>
+          <span className="badge red"><span className="dot red" /> short</span>
+          <span className="badge">{bars.length} bars</span>
+          <span className="badge">{trades.length} trades</span>
+        </div>
+      </div>
+      {err && <p className="neg">{err}</p>}
+      {bars.length === 0
+        ? <div className="empty">no bars yet for <b>{mode}</b> — they arrive on the TradingView
+            bar-feed webhook (or seed sample data). See TRADINGVIEW.md.</div>
+        : <CandleChart bars={bars} trades={trades} />}
+      <p className="hint" style={{ marginTop: 12, marginBottom: 0 }}>
+        Candles are fed by the Pine bar-feed alert; arrows mark where each trade went long/short.
+        FVG/IFVG boxes, killzone shading and click-to-mark-entry (turning a chart click into a
+        logged trade) arrive in Phase C.
+      </p>
+    </div>
   );
 }
 

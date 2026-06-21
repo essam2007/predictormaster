@@ -43,6 +43,21 @@ export interface WebhookAlert {
 }
 export interface AuthConfig { login_required: boolean; user: string }
 export interface LoginResult { ok: boolean; token: string; user: string }
+export interface Bar { time: number; open: number; high: number; low: number; close: number; volume: number }
+export interface JournalTrade {
+  entry_ts: string;
+  side: string;
+  entry_px: number;
+  exit_px: number | null;
+  realized_r: number;
+  realized_pnl: number;
+  killzone: string;
+  quarter_idx: number;
+  day_of_week: number;
+  path_clean: boolean;
+  moved_to_be_early: boolean;
+  exit_reason: string | null;
+}
 
 // --- Auth token (single-user cockpit) ----------------------------------------
 // The token /api/login hands back == the control token; it authorizes both reads
@@ -86,8 +101,10 @@ export const api = {
   summary: (mode = "backtest") => j<Summary>(`/api/analytics/summary?mode=${mode}`),
   equity: (mode = "backtest") => j<EquityPoint[]>(`/api/analytics/equity?mode=${mode}`),
   calibration: (mode = "backtest") => j<any>(`/api/analytics/calibration?mode=${mode}`),
-  trades: (mode = "backtest") => j<any[]>(`/api/trades?mode=${mode}`),
+  trades: (mode = "backtest") => j<JournalTrade[]>(`/api/trades?mode=${mode}`),
   webhooks: (limit = 100) => j<WebhookAlert[]>(`/api/webhooks?limit=${limit}`),
+  bars: (symbol = "NQ", timeframe = "5", mode = "demo", limit = 500) =>
+    j<Bar[]>(`/api/bars?symbol=${symbol}&timeframe=${timeframe}&mode=${mode}&limit=${limit}`),
   kill: (reason = "manual") =>
     j<any>(`/api/control/kill?reason=${encodeURIComponent(reason)}`, { method: "POST" }),
   resume: () => j<any>("/api/control/resume", { method: "POST" }),

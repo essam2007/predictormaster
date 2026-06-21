@@ -107,6 +107,26 @@ def test_webhooks_feed_lists_recent_alerts(client):
     assert feed[0]["kind"] == "trade" and feed[0]["realized_r"] == 1.5
 
 
+def test_pine_webhook_ingests_bars_for_charting(client):
+    """A Pine bar-feed alert carries OHLC bars -> stored under demo and served for charts."""
+    c, _ = client
+    bars = [
+        {"t": 1715780100, "o": 18000, "h": 18010, "l": 17995, "c": 18008, "v": 900},
+        {"t": 1715780400, "o": 18008, "h": 18020, "l": 18004, "c": 18016, "v": 1100},
+    ]
+    r = c.post("/webhooks/pine", json={"source": "pine", "symbol": "NQ",
+                                       "timeframe": "5", "bars": bars})
+    assert r.status_code == 200 and r.json()["bars_added"] == 2
+    # re-sending the same bars is idempotent (natural-key dedup)
+    assert c.post("/webhooks/pine", json={"source": "pine", "symbol": "NQ",
+                                          "timeframe": "5", "bars": bars}).json()["bars_added"] == 0
+    feed = c.get("/api/bars?symbol=NQ&timeframe=5&mode=demo").json()
+    assert len(feed) == 2
+    # chronological, Lightweight-Charts shape (unix-second `time`)
+    assert feed[0]["time"] == 1715780100 and feed[0]["close"] == 18008
+    assert feed[1]["time"] == 1715780400 and feed[1]["high"] == 18020
+
+
 def test_pine_webhook_trade_never_writes_live(client):
     """Even if a payload claims mode=live, webhook trades are forced to demo."""
     c, _ = client
