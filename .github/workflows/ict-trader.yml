@@ -29,3 +29,17 @@ jobs:
         run: mypy
       - name: pytest
         run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ict_trader/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: install
+        run: npm ci
+      - name: typecheck + build
+        run: npm run build   # tsc -b && vite build — fails on any TS error

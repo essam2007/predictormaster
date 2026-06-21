@@ -7,6 +7,7 @@ these; nothing here can place an order (the live engine owns execution).
 
 from __future__ import annotations
 
+import hmac
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -40,7 +41,8 @@ class AppState:
 
 def _require_control(state: AppState, authorization: str | None) -> None:
     token = (authorization or "").removeprefix("Bearer ").strip()
-    if not state.settings.control_token or token != state.settings.control_token:
+    expected = state.settings.control_token
+    if not expected or not hmac.compare_digest(token, expected):
         raise HTTPException(status_code=401, detail="control token required")
 
 
@@ -278,7 +280,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/webhooks/pine")
     async def pine_webhook(alert: PineAlert, st: AppState = Depends(get_state)) -> dict:
-        if st.settings.webhook_secret and alert.secret != st.settings.webhook_secret:
+        secret = st.settings.webhook_secret
+        if secret and not hmac.compare_digest(alert.secret or "", secret):
             raise HTTPException(status_code=403, detail="bad webhook secret")
         async with st.db.session() as s:
             await Repository(s).log_webhook(datetime.now(UTC),
