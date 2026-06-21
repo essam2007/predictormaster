@@ -1,0 +1,36 @@
+# Render blueprint for the ICT Trader research deck (DEMO only).
+# One-click: https://render.com/deploy?repo=https://github.com/essam2007/predictormaster/tree/claude/stoic-johnson-e12crn
+# Builds the UI + API into one container (ict_trader/Dockerfile) and serves it on a public URL.
+services:
+  - type: web
+    name: ict-trader-deck
+    runtime: docker
+    dockerfilePath: ict_trader/Dockerfile
+    dockerContext: ict_trader
+    plan: free                      # free web service (spins down when idle; data is ephemeral)
+    healthCheckPath: /healthz
+    autoDeploy: false
+    envVars:
+      - key: ICT_TRADER_API_HOST
+        value: "0.0.0.0"
+      - key: ICT_TRADER_MODE
+        value: demo                 # NEVER set live on a public host
+      - key: ICT_TRADER_ENGINE_AUTOSTART
+        value: "true"               # stream Tradovate DEMO + paper-trade once creds are set
+      - key: ICT_TRADER_CONTROL_TOKEN
+        generateValue: true         # auto-generated; read it in the Render dashboard
+      - key: ICT_TRADER_WEBHOOK_SECRET
+        generateValue: true
+      # Tradovate DEMO creds — set these in the Render dashboard (not stored in git):
+      - key: TRADOVATE_NAME
+        sync: false
+      - key: TRADOVATE_PASSWORD
+        sync: false
+      - key: TRADOVATE_CID
+        sync: false
+      - key: TRADOVATE_SECRET
+        sync: false
+      - key: TRADOVATE_ES_SYMBOL
+        sync: false
+      - key: TRADOVATE_NQ_SYMBOL
+        sync: false

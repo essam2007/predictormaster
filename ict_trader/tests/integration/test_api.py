@@ -49,7 +49,10 @@ def test_backtest_then_analytics(client):
     es, nq = tmp / "es.csv", tmp / "nq.csv"
     _write_csv(es, jitter=-0.01)
     _write_csv(nq, jitter=0.0)
-    r = c.post("/api/backtest", json={"es_csv": str(es), "nq_csv": str(nq), "traded": "NQ"})
+    # backtest is auth-gated (it reads server-side paths) — unauthenticated is rejected
+    assert c.post("/api/backtest", json={"es_csv": str(es), "nq_csv": str(nq)}).status_code == 401
+    r = c.post("/api/backtest", headers={"Authorization": "Bearer secret"},
+               json={"es_csv": str(es), "nq_csv": str(nq), "traded": "NQ"})
     assert r.status_code == 200
     body = r.json()
     assert body["n_setups"] > 0

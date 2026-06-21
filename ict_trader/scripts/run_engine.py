@@ -21,6 +21,7 @@ import asyncio
 import logging
 
 from ict_trader.config import get_risk_settings, get_settings
+from ict_trader.engine.bootstrap import build_live_feed
 from ict_trader.engine.pipeline import SignalPipeline
 from ict_trader.engine.runtime import LiveEngine
 from ict_trader.execution.risk import RiskEngine
@@ -53,7 +54,10 @@ async def _run(args: argparse.Namespace) -> None:
         return
 
     # --- live Tradovate feed (your account) ---
-    feed, rest = _build_live_feed(settings)
+    feed, rest = build_live_feed(settings)
+    if feed is None:
+        raise SystemExit("Tradovate credentials not set — fill TRADOVATE_* in .env "
+                         "(or use --replay-es/--replay-nq for CSV).")
     result = await rest.verify()
     if not result.get("connected"):
         await rest.close()
@@ -72,27 +76,6 @@ async def _run(args: argparse.Namespace) -> None:
         await engine.run(feed.stream())
     finally:
         await rest.close()
-
-
-def _build_live_feed(settings):
-    """Build the Tradovate market-data feed + a shared REST client from env creds."""
-    import httpx
-
-    from ict_trader.config import get_tradovate_settings
-    from ict_trader.execution.tradovate_rest import TradovateCredentials, TradovateREST
-    from ict_trader.marketdata.tradovate_md import TradovateMarketData
-
-    ts = get_tradovate_settings()
-    if not ts.configured:
-        raise SystemExit("Tradovate credentials not set — fill TRADOVATE_* in .env "
-                         "(or use --replay-es/--replay-nq for CSV).")
-    creds = TradovateCredentials(
-        name=ts.name, password=ts.password, app_id=ts.app_id, app_version=ts.app_version,
-        cid=ts.cid, sec=ts.secret, device_id=ts.device_id)
-    rest = TradovateREST(settings.tradovate_base_url, creds,
-                         client=httpx.AsyncClient(timeout=15.0))
-    feed = TradovateMarketData(rest, settings.tradovate_md_ws, ts.es_symbol, ts.nq_symbol)
-    return feed, rest
 
 
 async def _wire_persistence(engine, settings) -> None:

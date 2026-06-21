@@ -7,6 +7,7 @@ these; nothing here can place an order (the live engine owns execution).
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import os
 from collections.abc import AsyncIterator
@@ -37,6 +38,8 @@ class AppState:
         self.kill = KillSwitch()
         self.risk = RiskEngine()
         self.hub = LiveHub()
+        # background demo engine task (set in lifespan if configured)
+        self.engine_task: asyncio.Task | None = None
 
 
 def _require_control(state: AppState, authorization: str | None) -> None:
@@ -91,8 +94,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        from ..engine.bootstrap import start_demo_engine
+
         await state.db.create_all()
+        # Optionally stream the user's Tradovate DEMO data + paper-trade in-process
+        # (opt-in via ICT_TRADER_ENGINE_AUTOSTART; no-op without creds).
+        state.engine_task = await start_demo_engine(state.settings, state.db)
         yield
+        if state.engine_task is not None:
+            state.engine_task.cancel()
         await state.db.dispose()
 
     app = FastAPI(title="ict-trader research deck", version="0.1.0", lifespan=lifespan)
@@ -110,9 +120,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/status")
     async def status(st: AppState = Depends(get_state)) -> dict:
+        engine_running = st.engine_task is not None and not st.engine_task.done()
         return {
             "mode": st.settings.mode.value,
             "is_live": st.settings.is_live,
+            "engine_running": engine_running,
             "kill_switch": {"active": st.kill.active, "reason": st.kill.reason},
             "risk": {
                 "daily_loss_used": st.risk.daily_loss_used,
@@ -176,7 +188,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ]
 
     @app.post("/api/backtest")
-    async def run_backtest(req: BacktestRequest, st: AppState = Depends(get_state)) -> dict:
+    async def run_backtest(req: BacktestRequest, authorization: str | None = Header(default=None),
+                           st: AppState = Depends(get_state)) -> dict:
+        # reads CSV paths from the server FS -> require the control token (matters once hosted)
+        _require_control(st, authorization)
         import anyio
 
         from ..backtest.harness import Backtester

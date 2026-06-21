@@ -71,10 +71,12 @@ def main() -> None:
         asyncio.run(_seed_if_empty())
 
     s = get_settings()
-    url = f"http://{s.api_host}:{s.api_port}"
+    # Honor a host-provided PORT (Render/Heroku/etc.) so the deck works when deployed.
+    port = int(os.environ.get("PORT") or s.api_port)
+    url = f"http://{s.api_host}:{port}"
     print(f"\n  research deck:  {url}\n  API docs:       {url}/docs\n")
     uvicorn.run("ict_trader.api.app:create_app", factory=True,
-                host=s.api_host, port=s.api_port, reload=False)
+                host=s.api_host, port=port, reload=False)
 
 
 if __name__ == "__main__":
